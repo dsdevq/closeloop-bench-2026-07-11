@@ -12,6 +12,10 @@ closeloop.sln                   # solution file (repo root)
 global.json                     # pins SDK to net9.0
 backend/
   Domain/           Domain.csproj           classlib  — no outward project refs
+    Common/         Entity.cs               abstract base class (Id: Guid, protected init)
+    Entities/       Company.cs              domain aggregates
+  Domain.Tests/     Domain.Tests.csproj     xUnit tests for Domain layer
+    Entities/       CompanyTests.cs         entity invariant tests
   Infrastructure/   Infrastructure.csproj   classlib  — refs Domain
   Api/              Api.csproj              web app   — refs Infrastructure
         Program.cs  minimal API host
@@ -29,6 +33,7 @@ Api → Infrastructure → Domain
 
 ```bash
 dotnet build closeloop.sln --configuration Release   # full solution build
+dotnet test closeloop.sln --configuration Release    # build + run unit tests
 ```
 
 ## verify_cmd
@@ -37,7 +42,7 @@ dotnet build closeloop.sln --configuration Release   # full solution build
 bash scripts/verify.sh
 ```
 
-`scripts/verify.sh` checks that Domain has no outward project references (clean-arch enforcement), then runs `dotnet build closeloop.sln --configuration Release`.
+`scripts/verify.sh` checks that Domain has no outward project references (clean-arch enforcement), then runs `dotnet build closeloop.sln --configuration Release`, then runs `dotnet test --no-build` against the full solution. Test layers covered: **Domain unit tests** (`backend/Domain.Tests`).
 
 ## Research citation convention
 
@@ -53,9 +58,17 @@ sections:
 When creating a new research artifact, copy the section headings from that README verbatim and fill
 them in. Do not omit or rename a section.
 
+## Domain entity conventions
+
+All domain entities extend `Domain.Common.Entity` which provides `Id` (Guid, `protected init`).
+Entities use a **private constructor + static `Create` factory** pattern to enforce invariants at construction time.
+`Domain.Tests` is an xUnit project referencing only Domain — no Infrastructure or Api.
+`ImplicitUsings` does not pull in Xunit; add `using Xunit;` explicitly in every test file.
+
 ## Key decisions
 
 - `global.json` pins to `9.0.315` with `rollForward: latestPatch` so `dotnet` always resolves to .NET 9 even though .NET 10 is also installed.
 - Api project uses `Microsoft.NET.Sdk.Web` so ASP.NET Core meta-package is available without an explicit PackageReference.
 - `Program.cs` exposes `public partial class Program {}` so future integration-test projects can reference the entry-point assembly.
 - Marker types in Domain and Infrastructure keep the classlibs non-empty and compilable from day one.
+- `Company` (not `Organization`) aligns with HubSpot/Attio/Zoho terminology and target-user mental model (see `.devclaw/research/domain-model.md` §Rejected F).

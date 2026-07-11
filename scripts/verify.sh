@@ -13,3 +13,6 @@ fi
 
 # Full solution build in Release mode.
 dotnet build closeloop.sln --configuration Release
+
+# Run Domain unit tests.
+dotnet test closeloop.sln --configuration Release --no-build
