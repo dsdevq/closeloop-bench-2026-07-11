@@ -34,8 +34,10 @@ dotnet build closeloop.sln --configuration Release   # full solution build
 ## verify_cmd
 
 ```bash
-dotnet build closeloop.sln --configuration Release
+bash scripts/verify.sh
 ```
+
+`scripts/verify.sh` checks that Domain has no outward project references (clean-arch enforcement), then runs `dotnet build closeloop.sln --configuration Release`.
 
 ## Key decisions
 
