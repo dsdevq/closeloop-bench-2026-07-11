@@ -39,6 +39,20 @@ bash scripts/verify.sh
 
 `scripts/verify.sh` checks that Domain has no outward project references (clean-arch enforcement), then runs `dotnet build closeloop.sln --configuration Release`.
 
+## Research citation convention
+
+Feature research artifacts live under `.devclaw/research/<feature>.md`. Every such file must
+follow the template defined in **`.devclaw/research/README.md`**, which specifies three required
+sections:
+
+- `## Sources consulted` — which reference CRMs (Salesforce, HubSpot, Pipedrive, Attio, Zoho)
+  were examined and how.
+- `## Borrowed` — what specific pattern/design was adopted and from which CRM.
+- `## Rejected & why` — alternatives considered and the argued reason for not using them.
+
+When creating a new research artifact, copy the section headings from that README verbatim and fill
+them in. Do not omit or rename a section.
+
 ## Key decisions
 
 - `global.json` pins to `9.0.315` with `rollForward: latestPatch` so `dotnet` always resolves to .NET 9 even though .NET 10 is also installed.
