@@ -145,6 +145,25 @@ write-many affordances the API must support.
   view's bulk-select affordance. Limiting to fields that exist on the entity (name, email, phone,
   companyId) keeps the implementation bounded.
 
+### 7. HubSpot's email-as-deduplication-key with upsert semantics for CSV import
+
+- **What**: When importing contacts via CSV, HubSpot uses `email` as the canonical deduplication
+  key: if a row's email matches an existing contact, the import updates that contact's fields
+  rather than creating a duplicate. The outcome per row is one of `created`, `updated`, or
+  `failed` (validation error). The import API returns a per-row result array so the caller can
+  surface row-level errors without aborting the entire batch.
+- **From**: HubSpot CRM UI — the "Import" flow under Contacts (File upload → Field mapping →
+  Deduplication key selection, where Email is the default and recommended key); HubSpot Knowledge
+  Base article "Import contacts, companies, deals, and more" and the HubSpot Import API v3
+  (`POST /crm/v3/imports`).
+- **Why it fits**: The `Contact` entity already enforces `Email` as required and unique-within-tenant
+  (it is the natural lookup key for a sales rep's address book). Adopting email-keyed upsert
+  for `POST /contacts/import` means a re-uploaded CSV corrects stale field values instead of
+  duplicating records — the primary complaint from users in every CRM's community forum. A
+  `{ results: [{ row, status, contactId, error }] }` envelope in the response mirrors HubSpot's
+  row-level outcome model and lets the API caller surface a diff summary (N created, M updated,
+  K failed) without a separate status-poll endpoint.
+
 ---
 
 ## Rejected & why
