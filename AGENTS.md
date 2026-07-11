@@ -65,6 +65,18 @@ Entities use a **private constructor + static `Create` factory** pattern to enfo
 `Domain.Tests` is an xUnit project referencing only Domain — no Infrastructure or Api.
 `ImplicitUsings` does not pull in Xunit; add `using Xunit;` explicitly in every test file.
 
+## Local development — PostgreSQL
+
+A `docker-compose.yml` at repo root starts a PostgreSQL 16 container (`postgres` service, port 5432).
+Credentials are read from environment variables; copy `.env.example` to `.env` and fill in values before running:
+
+```bash
+cp .env.example .env
+docker compose up -d
+```
+
+Named volume `postgres_data` persists data across restarts.
+
 ## Key decisions
 
 - `global.json` pins to `9.0.315` with `rollForward: latestPatch` so `dotnet` always resolves to .NET 9 even though .NET 10 is also installed.
