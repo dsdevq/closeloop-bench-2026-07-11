@@ -19,3 +19,14 @@ The workspace grew a 'backend' and 'scripts' top-level directory that weren't pr
 
 ---
 
+## [2026-07-11T19:05:51+00:00] D1 — drift
+
+459 lines changed across 11 files since the last bookmark, exceeding the drift threshold — mostly additions (457 ins/2 del), consistent with new feature buildout rather than churn/rework. This follows directly on the prior D3 note about new 'backend' and 'scripts' top-level directories, suggesting the drift is continued expansion of that same new surface area rather than a separate concern.
+
+**Evidence:**
+- `git diff --stat 1f4e48148b504961a8b3c5b66fb3977dc76090b8..HEAD`
+
+**Proposed action:** _(none — pattern noted, no action recommended)_
+
+---
+
