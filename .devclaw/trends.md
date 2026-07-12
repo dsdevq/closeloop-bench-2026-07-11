@@ -30,3 +30,16 @@ The workspace grew a 'backend' and 'scripts' top-level directory that weren't pr
 
 ---
 
+## [2026-07-12T18:59:45+00:00] D3 — drift
+
+A '.devclaw' directory (likely internal tooling/config, distinct from application code) joined 'backend' as new top-level surface area, following directly on the two prior D3/D1 notes about 'backend' and 'scripts' growth. The recurrence across three consecutive bookmarks suggests this is sustained, deliberate feature buildout rather than a one-off addition — worth confirming against the goal's spec/AGENTS.md that this scope matches what was actually asked for.
+
+**Evidence:**
+- `git diff --diff-filter=A --name-only d834620d4da7711fe951b5db7339a3f5e45cbe98..HEAD`
+- `.devclaw/`
+- `backend/`
+
+**Proposed action:** If no AGENTS.md or spec exists yet for this goal, add one now capturing the intended top-level layout (backend/, scripts/, .devclaw/) so future drift checks have a baseline to compare against instead of flagging every new directory as unexplained.
+
+---
+
