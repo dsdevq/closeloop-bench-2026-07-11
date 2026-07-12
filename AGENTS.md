@@ -19,7 +19,9 @@ backend/
     Entities/       CompanyTests.cs         entity invariant tests
   Infrastructure/   Infrastructure.csproj   classlib  — refs Domain + Npgsql.EFCore.PG 9.x
     CrmDbContext.cs                         EF Core DbContext (6 DbSets)
+    CrmDbContextFactory.cs                  IDesignTimeDbContextFactory — env-sourced conn string for migrations
     Configurations/ IEntityTypeConfiguration<T> per aggregate (applied via ApplyConfigurationsFromAssembly)
+    Migrations/     EF Core migrations (InitialCreate) — generated, not executed at build time
   Infrastructure.Tests/ Infrastructure.Tests.csproj  xUnit — refs Infrastructure + EF Core InMemory
     CrmDbContextModelTests.cs              exercises OnModelCreating; asserts FK/cascade semantics
   Api/              Api.csproj              web app   — refs Infrastructure
@@ -70,6 +72,22 @@ Entities use a **private constructor + static `Create` factory** pattern to enfo
 `Domain.Tests` is an xUnit project referencing only Domain — no Infrastructure or Api.
 `ImplicitUsings` does not pull in Xunit; add `using Xunit;` explicitly in every test file.
 
+## EF Core migrations
+
+To add a new migration, install the global tool once (`dotnet tool install --global dotnet-ef --version 9.*`), then from the repo root:
+
+```bash
+dotnet ef migrations add <Name> --project backend/Infrastructure/Infrastructure.csproj --output-dir Migrations
+```
+
+`CrmDbContextFactory` provides the design-time context without a live DB. Connection string falls back to env var `ConnectionStrings__DefaultConnection` (double-underscore = colon separator in env vars), then to a local placeholder if absent.
+
+To apply migrations against a running Postgres instance:
+
+```bash
+dotnet ef database update --project backend/Infrastructure/Infrastructure.csproj
+```
+
 ## Local development — PostgreSQL
 
 A `docker-compose.yml` at repo root starts a PostgreSQL 16 container (`postgres` service, port 5432).
@@ -93,6 +111,7 @@ Named volume `postgres_data` persists data across restarts.
 - `ActivityType` is a closed enum (Note, Call, Email, Meeting, Task, StageChange). The research doc favours an open string registry; the closed enum was chosen for the domain layer to keep the model strict. Assumption: StageChange added beyond the research doc's five seed values because pipeline stage transitions are the primary audit event in a deal-centric CRM.
 - `CrmDbContext` uses `Npgsql.EntityFrameworkCore.PostgreSQL` version `9.0.*` (aligned with net9.0 target; v10 targets net10). Connection string sourced from `ConnectionStrings:DefaultConnection` in configuration/environment — never hardcoded.
 - EF Core `IEntityTypeConfiguration<T>` classes live in `Infrastructure/Configurations/`, applied via `ApplyConfigurationsFromAssembly`. Domain entities carry no data annotations (persistence-ignorant).
+- `Microsoft.EntityFrameworkCore.Design` in Infrastructure.csproj is `PrivateAssets=all` (design-time only). Explicit `Microsoft.EntityFrameworkCore` and `Microsoft.EntityFrameworkCore.Relational` references pin all EF Core packages to the same `9.0.*` version, preventing MSB3277 assembly-conflict warnings from Npgsql pulling in an older `[9.0.1, 10.0.0)` dependency.
 - `Pipeline._stages` is a `private readonly List<PipelineStage>` backing field. EF Core is told to use it via `Navigation(p => p.Stages).HasField("_stages").UsePropertyAccessMode(PropertyAccessMode.Field)` because the `Stages` getter returns a computed `IReadOnlyList` (OrderBy + ToList), not the field itself.
 - Activity anchor FKs (ContactId/CompanyId/DealId) use `DeleteBehavior.Restrict` — not SetNull — because nulling the sole anchor would silently violate the exactly-one-anchor domain invariant that Activity.Create enforces.
 - PipelineStage→Pipeline uses `DeleteBehavior.Cascade` (deleting a pipeline removes its stages). Deal→Pipeline and Deal→PipelineStage use `DeleteBehavior.Restrict` (cannot delete a pipeline or stage that has live deals).
