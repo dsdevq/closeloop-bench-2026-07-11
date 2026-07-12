@@ -20,6 +20,8 @@ backend/
   Infrastructure/   Infrastructure.csproj   classlib  — refs Domain + Npgsql.EFCore.PG 9.x
     CrmDbContext.cs                         EF Core DbContext (6 DbSets)
     Configurations/ IEntityTypeConfiguration<T> per aggregate (applied via ApplyConfigurationsFromAssembly)
+  Infrastructure.Tests/ Infrastructure.Tests.csproj  xUnit — refs Infrastructure + EF Core InMemory
+    CrmDbContextModelTests.cs              exercises OnModelCreating; asserts FK/cascade semantics
   Api/              Api.csproj              web app   — refs Infrastructure
         Program.cs  minimal API host + CrmDbContext DI registration (Npgsql)
 ```
@@ -45,7 +47,7 @@ dotnet test closeloop.sln --configuration Release    # build + run unit tests
 bash scripts/verify.sh
 ```
 
-`scripts/verify.sh` checks that Domain has no outward project references (clean-arch enforcement), then runs `dotnet build closeloop.sln --configuration Release`, then runs `dotnet test --no-build` against the full solution. Test layers covered: **Domain unit tests** (`backend/Domain.Tests`).
+`scripts/verify.sh` checks that Domain has no outward project references (clean-arch enforcement), then runs `dotnet build closeloop.sln --configuration Release`, then runs `dotnet test --no-build` against the full solution. Test layers covered: **Domain unit tests** (`backend/Domain.Tests`) and **Infrastructure model tests** (`backend/Infrastructure.Tests`).
 
 ## Research citation convention
 
