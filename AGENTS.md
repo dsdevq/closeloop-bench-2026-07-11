@@ -13,12 +13,15 @@ global.json                     # pins SDK to net9.0
 backend/
   Domain/           Domain.csproj           classlib  — no outward project refs
     Common/         Entity.cs               abstract base class (Id: Guid, protected init)
-    Entities/       Company.cs              domain aggregates
+    Entities/       Company.cs              domain aggregates (Company, Contact, Pipeline,
+                                            PipelineStage, Deal, Activity, ActivityType)
   Domain.Tests/     Domain.Tests.csproj     xUnit tests for Domain layer
     Entities/       CompanyTests.cs         entity invariant tests
-  Infrastructure/   Infrastructure.csproj   classlib  — refs Domain
+  Infrastructure/   Infrastructure.csproj   classlib  — refs Domain + Npgsql.EFCore.PG 9.x
+    CrmDbContext.cs                         EF Core DbContext (6 DbSets)
+    Configurations/ IEntityTypeConfiguration<T> per aggregate (applied via ApplyConfigurationsFromAssembly)
   Api/              Api.csproj              web app   — refs Infrastructure
-        Program.cs  minimal API host
+        Program.cs  minimal API host + CrmDbContext DI registration (Npgsql)
 ```
 
 ## Clean-architecture layering
@@ -86,3 +89,8 @@ Named volume `postgres_data` persists data across restarts.
 - `Company` (not `Organization`) aligns with HubSpot/Attio/Zoho terminology and target-user mental model (see `.devclaw/research/domain-model.md` §Rejected F).
 - `Activity` polymorphic target uses three nullable FKs (`ContactId`, `CompanyId`, `DealId`) with an exactly-one-anchor invariant enforced in `Create` — not a discriminated-pair (TargetType/TargetId) as described in the research doc. The research doc's design is noted but overridden by the implementation decision to mirror Deal's FK pattern.
 - `ActivityType` is a closed enum (Note, Call, Email, Meeting, Task, StageChange). The research doc favours an open string registry; the closed enum was chosen for the domain layer to keep the model strict. Assumption: StageChange added beyond the research doc's five seed values because pipeline stage transitions are the primary audit event in a deal-centric CRM.
+- `CrmDbContext` uses `Npgsql.EntityFrameworkCore.PostgreSQL` version `9.0.*` (aligned with net9.0 target; v10 targets net10). Connection string sourced from `ConnectionStrings:DefaultConnection` in configuration/environment — never hardcoded.
+- EF Core `IEntityTypeConfiguration<T>` classes live in `Infrastructure/Configurations/`, applied via `ApplyConfigurationsFromAssembly`. Domain entities carry no data annotations (persistence-ignorant).
+- `Pipeline._stages` is a `private readonly List<PipelineStage>` backing field. EF Core is told to use it via `Navigation(p => p.Stages).HasField("_stages").UsePropertyAccessMode(PropertyAccessMode.Field)` because the `Stages` getter returns a computed `IReadOnlyList` (OrderBy + ToList), not the field itself.
+- Activity anchor FKs (ContactId/CompanyId/DealId) use `DeleteBehavior.Restrict` — not SetNull — because nulling the sole anchor would silently violate the exactly-one-anchor domain invariant that Activity.Create enforces.
+- PipelineStage→Pipeline uses `DeleteBehavior.Cascade` (deleting a pipeline removes its stages). Deal→Pipeline and Deal→PipelineStage use `DeleteBehavior.Restrict` (cannot delete a pipeline or stage that has live deals).
