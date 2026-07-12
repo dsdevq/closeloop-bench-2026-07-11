@@ -14,7 +14,7 @@ fi
 # Full solution build in Release mode.
 dotnet build closeloop.sln --configuration Release
 
-# Run all unit tests (Domain unit tests + Infrastructure model tests).
+# Run all test projects: Domain.Tests, Infrastructure.Tests, Api.Tests, Tests.
 dotnet test closeloop.sln --configuration Release --no-build
 
 # Run Angular frontend unit tests.
