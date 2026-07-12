@@ -43,3 +43,17 @@ A '.devclaw' directory (likely internal tooling/config, distinct from applicatio
 
 ---
 
+## [2026-07-12T19:21:15+00:00] D1 — drift
+
+9,077 lines changed across 29 files since the last bookmark — an order of magnitude above the prior D1 note (459 lines/11 files) — but 9,076 of those are insertions with just 1 deletion, so this reads as continued net-new buildout rather than churn. Consistent with the two prior D3 notes flagging sustained growth of backend/, scripts/, and .devclaw/ as new top-level surface area.
+
+**Evidence:**
+- `git diff --stat 5ad5431f6342ed9726edcaac82bd32f4c8afc90d..HEAD`
+- `backend/`
+- `scripts/`
+- `.devclaw/`
+
+**Proposed action:** _(none — pattern noted, no action recommended)_
+
+---
+
