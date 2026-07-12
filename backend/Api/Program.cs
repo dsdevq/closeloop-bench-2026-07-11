@@ -1,3 +1,4 @@
+using Api.Features.Contacts;
 using Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,6 +15,7 @@ builder.Services.AddDbContext<CrmDbContext>(options =>
 var app = builder.Build();
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+app.MapContactsEndpoints();
 
 app.Run();
 

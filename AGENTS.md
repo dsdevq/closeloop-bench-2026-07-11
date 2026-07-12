@@ -49,7 +49,7 @@ dotnet test closeloop.sln --configuration Release    # build + run unit tests
 bash scripts/verify.sh
 ```
 
-`scripts/verify.sh` checks that Domain has no outward project references (clean-arch enforcement), then runs `dotnet build closeloop.sln --configuration Release`, then runs `dotnet test --no-build` against the full solution. Test layers covered: **Domain unit tests** (`backend/Domain.Tests`) and **Infrastructure model tests** (`backend/Infrastructure.Tests`).
+`scripts/verify.sh` checks that Domain has no outward project references (clean-arch enforcement), then runs `dotnet build closeloop.sln --configuration Release`, then runs `dotnet test --no-build` against the full solution. Test layers covered: **Domain unit tests** (`backend/Domain.Tests`), **Infrastructure model tests** (`backend/Infrastructure.Tests`), and **API integration tests** (`backend/Api.Tests`).
 
 ## Research citation convention
 
@@ -99,6 +99,29 @@ docker compose up -d
 ```
 
 Named volume `postgres_data` persists data across restarts.
+
+## API feature conventions
+
+Minimal API endpoints live under `backend/Api/Features/<Feature>/`:
+- `<Feature>Endpoints.cs` — static class with `MapXxxEndpoints(this IEndpointRouteBuilder)` extension; registers an `app.MapGroup("/<feature>")` and maps handlers.
+- `<Feature>Dtos.cs` — sealed records for request/response (never expose EF entities over the wire).
+- Wire the endpoint group in `Program.cs` with `app.MapXxxEndpoints()`.
+
+`Api.Tests` project uses `WebApplicationFactory<Program>` + `Microsoft.AspNetCore.Mvc.Testing` with EF Core InMemory. The critical DI override pattern — required because `IDbContextOptionsConfiguration<T>` (EF Core 9's hook for the `optionsAction`) is registered with `Add`, not `TryAdd`, so it must be removed explicitly before substituting InMemory:
+
+```csharp
+builder.ConfigureTestServices(services =>   // ConfigureTestServices runs AFTER Program.cs
+{
+    var optConfigType = typeof(IDbContextOptionsConfiguration<CrmDbContext>);
+    foreach (var d in services.Where(d => d.ServiceType == optConfigType).ToList())
+        services.Remove(d);
+    foreach (var d in services.Where(d => d.ServiceType == typeof(DbContextOptions<CrmDbContext>)).ToList())
+        services.Remove(d);
+    services.AddDbContext<CrmDbContext>(o => o.UseInMemoryDatabase("test_" + Guid.NewGuid()));
+});
+```
+
+Also: `Results.ValidationProblem` must receive `statusCode: StatusCodes.Status422UnprocessableEntity` explicitly — `HttpValidationProblemDetails` sets `Status = 400` in its constructor and `??=` does not override a non-null value, so omitting `statusCode` silently returns 400.
 
 ## Key decisions
 
