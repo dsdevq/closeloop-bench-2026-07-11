@@ -16,3 +16,6 @@ dotnet build closeloop.sln --configuration Release
 
 # Run all unit tests (Domain unit tests + Infrastructure model tests).
 dotnet test closeloop.sln --configuration Release --no-build
+
+# Run Angular frontend unit tests.
+(cd frontend && npm install --prefer-offline && npx ng test --watch=false)

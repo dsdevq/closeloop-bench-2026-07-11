@@ -4,12 +4,20 @@
 
 - **.NET 9** (pinned via `global.json` at repo root — use SDK 9.0.315)
 - Clean-architecture .NET solution
+- **Angular 21** frontend (`frontend/`) — standalone components, Vitest test runner via `@angular/build:unit-test`
 
 ## Repository layout
 
 ```
 closeloop.sln                   # solution file (repo root)
 global.json                     # pins SDK to net9.0
+frontend/                       # Angular 21 SPA
+  angular.json                  # workspace config; fileReplacements in development config only
+  src/
+    app/app.ts                  # root standalone component (imports RouterOutlet)
+    app/app.html                # <router-outlet /> only — no welcome-page content
+    app/app.spec.ts             # Vitest spec; tests: create + router-outlet presence
+    environments/               # environment.ts = production; environment.development.ts = dev
 backend/
   Domain/           Domain.csproj           classlib  — no outward project refs
     Common/         Entity.cs               abstract base class (Id: Guid, protected init)
@@ -41,6 +49,7 @@ Api → Infrastructure → Domain
 ```bash
 dotnet build closeloop.sln --configuration Release   # full solution build
 dotnet test closeloop.sln --configuration Release    # build + run unit tests
+cd frontend && ng test --watch=false                  # Angular unit tests (Vitest)
 ```
 
 ## verify_cmd
@@ -49,7 +58,7 @@ dotnet test closeloop.sln --configuration Release    # build + run unit tests
 bash scripts/verify.sh
 ```
 
-`scripts/verify.sh` checks that Domain has no outward project references (clean-arch enforcement), then runs `dotnet build closeloop.sln --configuration Release`, then runs `dotnet test --no-build` against the full solution. Test layers covered: **Domain unit tests** (`backend/Domain.Tests`), **Infrastructure model tests** (`backend/Infrastructure.Tests`), and **API integration tests** (`backend/Api.Tests`).
+`scripts/verify.sh` checks that Domain has no outward project references (clean-arch enforcement), then runs `dotnet build closeloop.sln --configuration Release`, then runs `dotnet test --no-build` against the full solution, then runs `ng test --watch=false` in `frontend/`. Test layers covered: **Domain unit tests** (`backend/Domain.Tests`), **Infrastructure model tests** (`backend/Infrastructure.Tests`), **API integration tests** (`backend/Api.Tests`), and **Angular unit tests** (`frontend/src/app/app.spec.ts`, Vitest via `@angular/build:unit-test`).
 
 ## Research citation convention
 
