@@ -17,7 +17,13 @@ frontend/                       # Angular 21 SPA
     app/app.ts                  # root standalone component (imports RouterOutlet)
     app/app.html                # <router-outlet /> only — no welcome-page content
     app/app.spec.ts             # Vitest spec; tests: create + router-outlet presence
+    app/app.routes.ts           # lazy-loaded route: /contacts → ContactsComponent
+    app/contacts/               # Contacts feature
+      contacts.service.ts       # ContactsService (inject(), HttpClient, list()/create())
+      contacts.component.ts     # ContactsComponent (standalone, signals, reactive form)
+      contacts.spec.ts          # Vitest specs: list render, create success, 422 error path
     environments/               # environment.ts = production; environment.development.ts = dev
+                                # both export apiBaseUrl ('' prod, 'http://localhost:5000' dev)
 backend/
   Domain/           Domain.csproj           classlib  — no outward project refs
     Common/         Entity.cs               abstract base class (Id: Guid, protected init)
@@ -58,7 +64,7 @@ cd frontend && ng test --watch=false                  # Angular unit tests (Vite
 bash scripts/verify.sh
 ```
 
-`scripts/verify.sh` checks that Domain has no outward project references (clean-arch enforcement), then runs `dotnet build closeloop.sln --configuration Release`, then runs `dotnet test --no-build` against the full solution, then runs `ng test --watch=false` in `frontend/`. Test layers covered: **Domain unit tests** (`backend/Domain.Tests`), **Infrastructure model tests** (`backend/Infrastructure.Tests`), **API integration tests** (`backend/Api.Tests`), and **Angular unit tests** (`frontend/src/app/app.spec.ts`, Vitest via `@angular/build:unit-test`).
+`scripts/verify.sh` checks that Domain has no outward project references (clean-arch enforcement), then runs `dotnet build closeloop.sln --configuration Release`, then runs `dotnet test --no-build` against the full solution, then runs `ng test --watch=false` in `frontend/`. Test layers covered: **Domain unit tests** (`backend/Domain.Tests`), **Infrastructure model tests** (`backend/Infrastructure.Tests`), **API integration tests** (`backend/Api.Tests`), and **Angular unit tests** (`frontend/src/app/**/*.spec.ts`, Vitest via `@angular/build:unit-test`).
 
 ## Research citation convention
 
@@ -131,6 +137,17 @@ builder.ConfigureTestServices(services =>   // ConfigureTestServices runs AFTER 
 ```
 
 Also: `Results.ValidationProblem` must receive `statusCode: StatusCodes.Status422UnprocessableEntity` explicitly — `HttpValidationProblemDetails` sets `Status = 400` in its constructor and `??=` does not override a non-null value, so omitting `statusCode` silently returns 400.
+
+## Angular frontend conventions
+
+- Standalone components; no NgModules.
+- Angular 21 built-in control flow (`@for ... @empty`, `@if`) — not `*ngFor`/`*ngIf` structural directives.
+- Signals (`signal()`) for mutable state; `inject()` for dependency injection (not constructor parameters).
+- `FormBuilder.nonNullable.group(...)` for reactive forms — avoids null-typed controls and resets to initial value on `reset()`.
+- `provideHttpClient()` is wired in `app.config.ts`; feature services use `inject(HttpClient)`.
+- `environment.apiBaseUrl` is the single source for the backend base URL (`''` in production, `http://localhost:5000` in development).
+- New routes are added to `app.routes.ts` as `loadComponent` lazy entries (no eagerly imported components in the router).
+- Tests use `provideHttpClient()` + `provideHttpClientTesting()` (not `HttpClientTestingModule`); `HttpTestingController` from `@angular/common/http/testing` intercepts all requests.
 
 ## Key decisions
 
