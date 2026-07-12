@@ -56,6 +56,8 @@ Api → Infrastructure → Domain
 dotnet build closeloop.sln --configuration Release   # full solution build
 dotnet test closeloop.sln --configuration Release    # build + run unit tests
 cd frontend && ng test --watch=false                  # Angular unit tests (Vitest)
+cd frontend && ng serve                               # start the Angular dev server (default http://localhost:4200)
+cd frontend && ng build                               # production build (output to frontend/dist/)
 ```
 
 ## verify_cmd
