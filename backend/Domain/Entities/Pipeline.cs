@@ -27,6 +27,9 @@ public sealed class Pipeline : Entity
 
     public void AddStage(string name, int order, int? winProbability = null)
     {
+        if (_stages.Any(s => s.Order == order))
+            throw new ArgumentException($"A stage with order {order} already exists in this pipeline.", nameof(order));
+
         _stages.Add(PipelineStage.Create(Id, name, order, winProbability));
     }
 }
