@@ -68,6 +68,18 @@ bash scripts/verify.sh
 
 `scripts/verify.sh` checks that Domain has no outward project references (clean-arch enforcement), then runs `dotnet build closeloop.sln --configuration Release`, then runs `dotnet test --no-build` against the full solution, then runs `ng test --watch=false` in `frontend/`. Test layers covered: **Domain unit tests** (`backend/Domain.Tests`), **Infrastructure model tests** (`backend/Infrastructure.Tests`), **API integration tests** (`backend/Api.Tests`), and **Angular unit tests** (`frontend/src/app/**/*.spec.ts`, Vitest via `@angular/build:unit-test`).
 
+## Docker
+
+A multi-stage root `Dockerfile` builds the full stack:
+
+1. **node-build** — `node:22-alpine`; installs deps with `npm ci`, runs `ng build --configuration production`; output lands at `dist/frontend/browser/`.
+2. **dotnet-build** — `mcr.microsoft.com/dotnet/sdk:9.0.315` (exact version from `global.json`); restores and publishes `backend/Api/Api.csproj` to `/publish`.
+3. **runtime** — `mcr.microsoft.com/dotnet/aspnet:9.0`; copies published API + Angular bundle into `wwwroot/`.
+
+### Known gaps / Docker
+
+**Static-file serving not wired** — `backend/Api/Program.cs` does not yet call `UseDefaultFiles()` + `UseStaticFiles()`. The Angular bundle is copied into `wwwroot/` in the image but the API does not serve it at runtime. When that hookup is added to Program.cs the frontend will be served from the same origin as the API (no separate server needed). Until then, `docker run` on this image exposes only the `/health` and `/contacts` API endpoints.
+
 ## Research citation convention
 
 Feature research artifacts live under `.devclaw/research/<feature>.md`. Every such file must
