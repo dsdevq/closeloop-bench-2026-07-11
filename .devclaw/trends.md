@@ -57,3 +57,14 @@ A '.devclaw' directory (likely internal tooling/config, distinct from applicatio
 
 ---
 
+## [2026-07-14T08:27:55+00:00] D1 — drift
+
+2,146 lines changed across 8 files since the last bookmark, well above the prior D1 readings (459 then 9,077 lines) but overwhelmingly additive (1,049 ins/24 del), consistent with the sustained backend/scripts/.devclaw buildout flagged in the three preceding D3 notes rather than new churn or rework.
+
+**Evidence:**
+- `git diff --stat 7d512a866999e40c2aa18e886eda93ea63f180ca..HEAD`
+
+**Proposed action:** _(none — pattern noted, no action recommended)_
+
+---
+
