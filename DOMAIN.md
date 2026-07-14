@@ -27,8 +27,8 @@ Primary research artifacts (read these for source-level detail):
 
 All six domain entities and their EF Core configurations are shipped. The `InitialCreate` migration
 captures all six tables. Only the Contacts API feature (`backend/Api/Features/Contacts/`) has REST
-endpoints; Companies, Deals, Activities, and Pipelines are **modeled, implementation pending** at
-the API layer.
+endpoints; the Companies API feature (`backend/Api/Features/Companies/`) is now also implemented.
+Deals, Activities, and Pipelines are **modeled, implementation pending** at the API layer.
 
 ---
 
@@ -76,7 +76,7 @@ the API layer.
 
 ---
 
-### Company — modeled, API implementation pending
+### Company — implemented (backend model + migration + API + tests, frontend component + spec)
 
 **Shipped fields** (`backend/Domain/Entities/Company.cs`):
 

@@ -1,3 +1,4 @@
+using Api.Features.Companies;
 using Api.Features.Contacts;
 using Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -16,6 +17,7 @@ var app = builder.Build();
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 app.MapContactsEndpoints();
+app.MapCompaniesEndpoints();
 
 app.Run();
 
