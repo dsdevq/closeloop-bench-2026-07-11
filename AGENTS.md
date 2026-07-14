@@ -22,6 +22,10 @@ frontend/                       # Angular 21 SPA
       contacts.service.ts       # ContactsService (inject(), HttpClient, list()/create())
       contacts.component.ts     # ContactsComponent (standalone, signals, reactive form)
       contacts.spec.ts          # Vitest specs: list render, create success, 422 error path
+    app/companies/              # Companies feature (mirrors Contacts exactly)
+      companies.service.ts      # CompaniesService (inject(), HttpClient, list()/create())
+      companies.component.ts    # CompaniesComponent (standalone, signals, reactive form)
+      companies.spec.ts         # Vitest specs: list render, empty state, create, 422 error path
     environments/               # environment.ts = production; environment.development.ts = dev
                                 # both export apiBaseUrl ('' prod, 'http://localhost:5000' dev)
 backend/
@@ -40,6 +44,9 @@ backend/
     CrmDbContextModelTests.cs              exercises OnModelCreating; asserts FK/cascade semantics
   Api/              Api.csproj              web app   — refs Infrastructure
         Program.cs  minimal API host + CrmDbContext DI registration (Npgsql)
+    Features/
+      Contacts/     ContactsEndpoints.cs, ContactDtos.cs  (GET list/detail, POST create)
+      Companies/    CompaniesEndpoints.cs, CompanyDtos.cs (GET list/detail, POST create)
 ```
 
 ## Clean-architecture layering
