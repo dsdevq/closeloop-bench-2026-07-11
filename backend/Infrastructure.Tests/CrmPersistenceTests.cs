@@ -3,7 +3,7 @@ using Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace Tests.Persistence;
+namespace Infrastructure.Tests;
 
 // Cross-layer round-trip tests: Domain entity factories + Infrastructure EF Core context.
 // Infrastructure.Tests covers model metadata; these tests exercise actual save/query behaviour.
