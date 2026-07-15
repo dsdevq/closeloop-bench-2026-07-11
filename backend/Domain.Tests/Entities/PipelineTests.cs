@@ -1,3 +1,10 @@
+// Audit: backend/Tests/Domain/PipelineTests.cs → Domain.Tests/Entities/PipelineTests.cs
+//   Stages_AreReturnedInAscendingOrderByOrderField_RegardlessOfInsertionSequence  already covered: Stages_EnumeratesInAscendingOrderByOrder_RegardlessOfInsertionSequence
+//   Stages_OrderFieldIsUniqueAcrossAllStagesInPipeline                            ported this PR: Stages_OrderFieldIsUniqueAcrossAllStagesInPipeline
+//   AddStage_WithDuplicateOrder_ThrowsArgumentException                           ported this PR: AddStage_WithDuplicateOrder_ThrowsArgumentException
+//   AddStage_WithNegativeOrder_ThrowsArgumentException                            already covered: AddStage_WithNegativeOrder_ThrowsArgumentException
+//   AddStage_DuplicateOrderRejectedAfterMultipleStagesAlreadyAdded                ported this PR: AddStage_DuplicateOrderRejectedAfterMultipleStagesAlreadyAdded
+
 using Domain.Entities;
 using Xunit;
 
@@ -54,6 +61,19 @@ public sealed class PipelineTests
 
         Assert.Equal(new[] { 0, 1, 2 }, pipeline.Stages.Select(s => s.Order).ToArray());
         Assert.Equal(new[] { "Stage A", "Stage B", "Stage C" }, pipeline.Stages.Select(s => s.Name).ToArray());
+    }
+
+    [Fact]
+    public void Stages_OrderFieldIsUniqueAcrossAllStagesInPipeline()
+    {
+        var pipeline = Pipeline.Create("Sales");
+        pipeline.AddStage("Prospecting", order: 0);
+        pipeline.AddStage("Qualified", order: 1);
+        pipeline.AddStage("Closing", order: 2);
+
+        var orders = pipeline.Stages.Select(s => s.Order).ToArray();
+
+        Assert.Equal(orders.Distinct().Count(), orders.Length);
     }
 
     [Fact]
@@ -119,6 +139,29 @@ public sealed class PipelineTests
         var pipeline = Pipeline.Create("Sales Pipeline");
 
         var ex = Assert.Throws<ArgumentException>(() => pipeline.AddStage("Stage", -1));
+
+        Assert.Equal("order", ex.ParamName);
+    }
+
+    [Fact]
+    public void AddStage_WithDuplicateOrder_ThrowsArgumentException()
+    {
+        var pipeline = Pipeline.Create("Sales");
+        pipeline.AddStage("Prospecting", order: 0);
+
+        var ex = Assert.Throws<ArgumentException>(() => pipeline.AddStage("Qualified", order: 0));
+
+        Assert.Equal("order", ex.ParamName);
+    }
+
+    [Fact]
+    public void AddStage_DuplicateOrderRejectedAfterMultipleStagesAlreadyAdded()
+    {
+        var pipeline = Pipeline.Create("Sales");
+        pipeline.AddStage("Prospecting", order: 0);
+        pipeline.AddStage("Qualified", order: 1);
+
+        var ex = Assert.Throws<ArgumentException>(() => pipeline.AddStage("Closing", order: 1));
 
         Assert.Equal("order", ex.ParamName);
     }

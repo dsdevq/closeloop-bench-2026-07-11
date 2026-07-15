@@ -1,3 +1,9 @@
+// Audit: backend/Tests/Domain/DealTests.cs → Domain.Tests/Entities/DealTests.cs
+//   AdvanceTo_StageOutsidePipeline_Throws              already covered: AdvanceTo_StageFromDifferentPipeline_ThrowsArgumentException
+//   AdvanceTo_StageInSamePipeline_UpdatesPipelineStageId  already covered: AdvanceTo_StageInSamePipeline_UpdatesPipelineStageId
+//   AdvanceTo_StageInSamePipeline_DoesNotChangePipelineId ported this PR: AdvanceTo_StageInSamePipeline_DoesNotChangePipelineId
+//   AdvanceTo_CanAdvanceMultipleTimes_WithinSamePipeline  ported this PR: AdvanceTo_CanAdvanceMultipleTimes_WithinSamePipeline
+
 using Domain.Entities;
 using Xunit;
 
@@ -99,6 +105,38 @@ public sealed class DealTests
         deal.AdvanceTo(secondStage);
 
         Assert.Equal(secondStage.Id, deal.PipelineStageId);
+    }
+
+    [Fact]
+    public void AdvanceTo_StageInSamePipeline_DoesNotChangePipelineId()
+    {
+        var (pipeline, firstStage) = MakePipelineWithStage();
+        pipeline.AddStage("Qualified", order: 1);
+        var secondStage = pipeline.Stages[1];
+
+        var deal = Deal.Create(500m, pipeline.Id, firstStage.Id);
+
+        deal.AdvanceTo(secondStage);
+
+        Assert.Equal(pipeline.Id, deal.PipelineId);
+    }
+
+    [Fact]
+    public void AdvanceTo_CanAdvanceMultipleTimes_WithinSamePipeline()
+    {
+        var pipeline = Pipeline.Create("Sales");
+        pipeline.AddStage("Prospecting", order: 0);
+        pipeline.AddStage("Qualified", order: 1);
+        pipeline.AddStage("Closing", order: 2);
+
+        var stages = pipeline.Stages;
+        var deal = Deal.Create(1000m, pipeline.Id, stages[0].Id);
+
+        deal.AdvanceTo(stages[1]);
+        Assert.Equal(stages[1].Id, deal.PipelineStageId);
+
+        deal.AdvanceTo(stages[2]);
+        Assert.Equal(stages[2].Id, deal.PipelineStageId);
     }
 
     [Fact]
