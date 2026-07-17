@@ -83,6 +83,14 @@ A multi-stage root `Dockerfile` builds the full stack:
 2. **dotnet-build** — `mcr.microsoft.com/dotnet/sdk:9.0.315` (exact version from `global.json`); restores and publishes `backend/Api/Api.csproj` to `/publish`.
 3. **runtime** — `mcr.microsoft.com/dotnet/aspnet:9.0`; copies published API + Angular bundle into `wwwroot/`.
 
+### Known gaps / Temporary duplicate test files
+
+`backend/Tests/Domain/DealTests.cs` and `backend/Tests/Domain/PipelineTests.cs` are intentionally
+retained dead weight. Their audited, fully-ported equivalents were merged into `backend/Domain.Tests/`
+in PR #3. They are kept only because devclaw's test-integrity gate cannot currently credit a
+prior-PR-audited equivalent on a deletion diff. **Do not delete these files until that harness
+gap is fixed.**
+
 ### Known gaps / Docker
 
 **Static-file serving not wired** — `backend/Api/Program.cs` does not yet call `UseDefaultFiles()` + `UseStaticFiles()`. The Angular bundle is copied into `wwwroot/` in the image but the API does not serve it at runtime. When that hookup is added to Program.cs the frontend will be served from the same origin as the API (no separate server needed). Until then, `docker run` on this image exposes only the `/health` and `/contacts` API endpoints.
