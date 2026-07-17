@@ -68,3 +68,15 @@ A '.devclaw' directory (likely internal tooling/config, distinct from applicatio
 
 ---
 
+## [2026-07-17T12:16:11+00:00] D3 — drift
+
+A new top-level '.devclaw' directory appeared, but per the prior 2026-07-12 D3 note '.devclaw' was already flagged as new top-level surface area at that time — this looks like the same directory recurring rather than a genuinely new one, possibly a bookmark/diff-base artifact rather than fresh drift.
+
+**Evidence:**
+- `git diff --diff-filter=A --name-only cd71f6d8df4f0bc10a9a38858c89b63e86edab5e..HEAD`
+- `.devclaw/`
+
+**Proposed action:** _(none — pattern noted, no action recommended)_
+
+---
+
