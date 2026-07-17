@@ -5,6 +5,7 @@ namespace Domain.Entities;
 public sealed class Pipeline : Entity
 {
     public string Name { get; private set; } = default!;
+    public int? RottingThresholdDays { get; private set; }
 
     private readonly List<PipelineStage> _stages = new();
 
@@ -31,5 +32,12 @@ public sealed class Pipeline : Entity
             throw new ArgumentException($"A stage with order {order} already exists in this pipeline.", nameof(order));
 
         _stages.Add(PipelineStage.Create(Id, name, order, winProbability));
+    }
+
+    public void SetRottingThresholdDays(int? days)
+    {
+        if (days.HasValue && days.Value < 1)
+            throw new ArgumentException("RottingThresholdDays must be at least 1.", nameof(days));
+        RottingThresholdDays = days;
     }
 }

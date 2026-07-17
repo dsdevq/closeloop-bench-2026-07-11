@@ -13,6 +13,7 @@ public class CrmDbContext : DbContext
     public DbSet<PipelineStage> PipelineStages => Set<PipelineStage>();
     public DbSet<Deal> Deals => Set<Deal>();
     public DbSet<Activity> Activities => Set<Activity>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
