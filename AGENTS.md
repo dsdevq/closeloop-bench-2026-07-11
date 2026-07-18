@@ -134,6 +134,22 @@ notification. Salesforce's configurable rule engine, HubSpot's webhook-first pus
 record-following subscription, and Pipedrive's email fallback are all explicitly rejected (see
 artifact for argued reasoning).
 
+### Known gap / DealRottingNotificationJob not wired live
+
+`backend/Infrastructure/Jobs/DealRottingNotificationJob.cs` is fully implemented and covered
+by tests in `backend/Infrastructure.Tests/Jobs/DealRottingNotificationJobTests.cs`, but is
+**deliberately NOT registered** as a hosted service in `backend/Api/Program.cs`.
+
+**Reason**: The job creates `DealRotting` notifications addressed to `deal.OwnerId`, but the
+`Deal` entity does not yet have an ownership field (`Deal.OwnerId` or equivalent). Without it,
+the job can identify rotting deals but cannot determine who to notify, so every scan cycle is
+a no-op. Wiring an inert hosted service into production adds overhead with no benefit.
+
+**Unblock**: Add `Deal.OwnerId` (or an equivalent deal-ownership concept) as a separate,
+focused follow-up PR. Once that field exists, re-register the job in `Program.cs` with
+`builder.Services.AddHostedService<DealRottingNotificationJob>()` and remove the skip guard
+inside `ScanAsync`.
+
 ## Domain entity conventions
 
 All domain entities extend `Domain.Common.Entity` which provides `Id` (Guid, `protected init`).
