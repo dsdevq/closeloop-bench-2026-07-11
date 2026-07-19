@@ -18,9 +18,6 @@ builder.Services.AddDbContext<CrmDbContext>(options =>
 
 builder.Services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
 
-// DealRottingNotificationJob is implemented and tested but deliberately NOT registered here.
-// It requires Deal.OwnerId to identify the notification recipient. See AGENTS.md.
-
 var app = builder.Build();
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
