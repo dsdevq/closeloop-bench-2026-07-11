@@ -206,6 +206,17 @@ Response shape for `GET /notifications`:
   returning unread mention events and follower updates). Examined via `developers.attio.com`
   API reference and Attio's public product changelog post "Mentions in notes and tasks" (2023).
 
+- **Zoho** — *Skipped.* Zoho CRM's primary notification surface is **SalesSignals**: a real-time
+  presence tracker that fires alerts when a tracked customer performs a cross-channel action (visits
+  the website, opens an email, tweets, calls in). SalesSignals is fundamentally a *customer-behavior
+  monitoring* surface, not a CRM-record-mutation notification system. The six triggers closeloop
+  targets (ownership change, stage change, deal rotting, @mention, task due) are all record-mutation
+  events fully covered by the HubSpot, Salesforce, Pipedrive, and Attio sources above. Zoho does
+  offer a Feed module with @mention (analogous to Salesforce Chatter and Attio Notes, both already
+  examined) and a Notification API for workflow automation, but neither surface introduces a design
+  pattern not already captured by the four CRMs consulted. Reviewing Zoho would duplicate coverage
+  without affecting the design decisions.
+
 ---
 
 ## Borrowed
