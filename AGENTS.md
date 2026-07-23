@@ -95,6 +95,28 @@ gap is fixed.**
 
 **Static-file serving not wired** — `backend/Api/Program.cs` does not yet call `UseDefaultFiles()` + `UseStaticFiles()`. The Angular bundle is copied into `wwwroot/` in the image but the API does not serve it at runtime. When that hookup is added to Program.cs the frontend will be served from the same origin as the API (no separate server needed). Until then, `docker run` on this image exposes only the `/health` and `/contacts` API endpoints.
 
+### Known gaps / Notification dispatcher
+
+Three of the four `INotificationDispatcher` methods are **no-op stubs** in
+`Infrastructure/Services/NotificationDispatcher.cs`:
+
+| Method | Blocked on |
+|---|---|
+| `DealAssignedAsync` | `Deal.OwnerId` field not yet in domain model |
+| `DealStageChangedAsync` | `Deal.OwnerId` field not yet in domain model |
+| `ContactAssignedAsync` | `Contact.OwnerId` field not yet in domain model |
+
+Until `Deal.OwnerId` and `Contact.OwnerId` are added (plus the PATCH endpoints that change
+ownership), these methods return `Task.CompletedTask` without creating any notification records.
+`ActivityMentionAsync` is the only dispatcher method fully wired to a real endpoint
+(`POST /activities`).
+
+`Pipeline.RottingThresholdDays` (`int?`) **is implemented** in the domain entity and EF configuration
+but has no consumer: the `DealRottingNotificationJob` background hosted service was deleted as
+permanently dead code (it referenced `Deal.OwnerId` which does not exist). Until the ownership
+slice lands and the background job is re-introduced, `RottingThresholdDays` is an orphaned field
+that can be set via `Pipeline.SetRottingThresholdDays()` but never read by any job or endpoint.
+
 ## Research citation convention
 
 Feature research artifacts live under `.devclaw/research/<feature>.md`. Every such file must
@@ -125,13 +147,18 @@ The `notifications.md` artifact defines: `Notification` entity (`Id`, `Recipient
 `Title`, `Body`, `RelatedEntityId`, `RelatedEntityType`, `IsRead`, `CreatedAt`); `NotificationTrigger`
 enum (six values: `DealAssigned`, `DealStageChanged`, `DealRotting`, `ContactAssigned`,
 `ActivityMention`, `TaskDue`); `NotificationEntityType` enum (`Contact`, `Company`, `Deal`,
-`Activity`); `INotificationDispatcher` interface (one method per trigger, injected into API endpoint
-handlers post-SaveChanges); and three API endpoints (`GET /notifications`,
-`PATCH /notifications/{id}/read`, `POST /notifications/read-all`). Design borrows from HubSpot's
-named-trigger taxonomy, Attio's @mention surface, and Pipedrive's pipeline-scoped rotting
-notification. Salesforce's configurable rule engine, HubSpot's webhook-first push model, Attio's
-record-following subscription, and Pipedrive's email fallback are all explicitly rejected (see
-artifact for argued reasoning).
+`Activity`); `INotificationDispatcher` interface (four methods — one per event-driven trigger);
+and three API endpoints (`GET /notifications`, `PATCH /notifications/{id}/read`,
+`POST /notifications/read-all`). Design borrows from HubSpot's named-trigger taxonomy, Attio's
+@mention surface, and Pipedrive's pipeline-scoped rotting notification. Salesforce's configurable
+rule engine, HubSpot's webhook-first push model, Attio's record-following subscription, and
+Pipedrive's email fallback are all explicitly rejected (see artifact for argued reasoning).
+
+**Current wiring state**: `ActivityMentionAsync` is called from `POST /activities` after
+`SaveChanges` — the only dispatcher method currently integrated into a real endpoint. The other
+three methods (`DealAssignedAsync`, `DealStageChangedAsync`, `ContactAssignedAsync`) are no-op
+stubs in `NotificationDispatcher` pending `Deal.OwnerId` and `Contact.OwnerId` fields, which are
+not yet in the domain model (see Known Gaps below).
 
 ## Domain entity conventions
 
@@ -218,5 +245,5 @@ Also: `Results.ValidationProblem` must receive `statusCode: StatusCodes.Status42
 - Activity anchor FKs (ContactId/CompanyId/DealId) use `DeleteBehavior.Restrict` — not SetNull — because nulling the sole anchor would silently violate the exactly-one-anchor domain invariant that Activity.Create enforces.
 - PipelineStage→Pipeline uses `DeleteBehavior.Cascade` (deleting a pipeline removes its stages). Deal→Pipeline and Deal→PipelineStage use `DeleteBehavior.Restrict` (cannot delete a pipeline or stage that has live deals).
 - `NotificationTrigger` is a closed enum (six values). A seventh trigger is an additive enum extension, not a rule-record migration — this was the explicit reason for rejecting Salesforce's configurable rule-engine model (see `.devclaw/research/notifications.md` §Rejected A).
-- `INotificationDispatcher` lives at the Domain boundary; the concrete implementation sits in Infrastructure. Endpoint handlers call it post-SaveChanges; the dispatcher does a second SaveChanges (eventual consistency, acceptable for informational notifications).
-- `@mention` syntax in `Activity.Note` is parsed in the application (endpoint) layer, not in the `Activity` domain entity — the entity stays `string?`-typed; mention resolution is an application concern injected via `INotificationDispatcher.ActivityMentionAsync`. Email/SMS fallback delivery was explicitly deferred (see `.devclaw/research/notifications.md` §Rejected D).
+- `INotificationDispatcher` lives at the Domain boundary; the concrete implementation sits in Infrastructure. `POST /activities` calls `ActivityMentionAsync` post-SaveChanges; the dispatcher does a second SaveChanges (eventual consistency, acceptable for informational notifications). The other three methods (`DealAssignedAsync`, `DealStageChangedAsync`, `ContactAssignedAsync`) are currently no-op stubs — see Known Gaps / Notification dispatcher.
+- `@mention` syntax in `Activity.Note` is parsed in the application (endpoint) layer, not in the `Activity` domain entity — the entity stays `string?`-typed; mention resolution is an application concern injected via `INotificationDispatcher.ActivityMentionAsync`. Pattern: `@<uuid>` (UUID rather than display name). Email/SMS fallback delivery was explicitly deferred (see `.devclaw/research/notifications.md` §Rejected D).
