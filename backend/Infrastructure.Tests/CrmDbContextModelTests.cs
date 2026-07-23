@@ -66,4 +66,38 @@ public sealed class CrmDbContextModelTests
 
         Assert.Equal(DeleteBehavior.Cascade, fk.DeleteBehavior);
     }
+
+    [Fact]
+    public void OnModelCreating_IncludesNotificationEntity()
+    {
+        using var ctx = BuildContext();
+        var entityTypes = ctx.Model.GetEntityTypes().Select(e => e.ClrType).ToHashSet();
+        Assert.Contains(typeof(Notification), entityTypes);
+    }
+
+    [Fact]
+    public void OnModelCreating_Notification_MappedToNotificationsTable()
+    {
+        using var ctx = BuildContext();
+        var entity = ctx.Model.FindEntityType(typeof(Notification))!;
+        Assert.Equal("notifications", entity.GetTableName());
+    }
+
+    [Fact]
+    public void OnModelCreating_Notification_RecipientUserId_IsRequired()
+    {
+        using var ctx = BuildContext();
+        var entity = ctx.Model.FindEntityType(typeof(Notification))!;
+        var prop = entity.FindProperty(nameof(Notification.RecipientUserId))!;
+        Assert.False(prop.IsNullable);
+    }
+
+    [Fact]
+    public void OnModelCreating_Notification_Title_HasMaxLength500()
+    {
+        using var ctx = BuildContext();
+        var entity = ctx.Model.FindEntityType(typeof(Notification))!;
+        var prop = entity.FindProperty(nameof(Notification.Title))!;
+        Assert.Equal(500, prop.GetMaxLength());
+    }
 }

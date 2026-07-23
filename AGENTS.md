@@ -126,29 +126,12 @@ The `notifications.md` artifact defines: `Notification` entity (`Id`, `Recipient
 enum (six values: `DealAssigned`, `DealStageChanged`, `DealRotting`, `ContactAssigned`,
 `ActivityMention`, `TaskDue`); `NotificationEntityType` enum (`Contact`, `Company`, `Deal`,
 `Activity`); `INotificationDispatcher` interface (one method per trigger, injected into API endpoint
-handlers post-SaveChanges); `DealRottingNotificationJob` background hosted service (6-hour scan,
-24-hour deduplication guard); and three API endpoints (`GET /notifications`,
+handlers post-SaveChanges); and three API endpoints (`GET /notifications`,
 `PATCH /notifications/{id}/read`, `POST /notifications/read-all`). Design borrows from HubSpot's
 named-trigger taxonomy, Attio's @mention surface, and Pipedrive's pipeline-scoped rotting
 notification. Salesforce's configurable rule engine, HubSpot's webhook-first push model, Attio's
 record-following subscription, and Pipedrive's email fallback are all explicitly rejected (see
 artifact for argued reasoning).
-
-### Known gap / DealRottingNotificationJob not wired live
-
-`backend/Infrastructure/Jobs/DealRottingNotificationJob.cs` is fully implemented and covered
-by tests in `backend/Infrastructure.Tests/Jobs/DealRottingNotificationJobTests.cs`, but is
-**deliberately NOT registered** as a hosted service in `backend/Api/Program.cs`.
-
-**Reason**: The job creates `DealRotting` notifications addressed to `deal.OwnerId`, but the
-`Deal` entity does not yet have an ownership field (`Deal.OwnerId` or equivalent). Without it,
-the job can identify rotting deals but cannot determine who to notify, so every scan cycle is
-a no-op. Wiring an inert hosted service into production adds overhead with no benefit.
-
-**Unblock**: Add `Deal.OwnerId` (or an equivalent deal-ownership concept) as a separate,
-focused follow-up PR. Once that field exists, re-register the job in `Program.cs` with
-`builder.Services.AddHostedService<DealRottingNotificationJob>()` and remove the skip guard
-inside `ScanAsync`.
 
 ## Domain entity conventions
 
@@ -235,5 +218,5 @@ Also: `Results.ValidationProblem` must receive `statusCode: StatusCodes.Status42
 - Activity anchor FKs (ContactId/CompanyId/DealId) use `DeleteBehavior.Restrict` — not SetNull — because nulling the sole anchor would silently violate the exactly-one-anchor domain invariant that Activity.Create enforces.
 - PipelineStage→Pipeline uses `DeleteBehavior.Cascade` (deleting a pipeline removes its stages). Deal→Pipeline and Deal→PipelineStage use `DeleteBehavior.Restrict` (cannot delete a pipeline or stage that has live deals).
 - `NotificationTrigger` is a closed enum (six values). A seventh trigger is an additive enum extension, not a rule-record migration — this was the explicit reason for rejecting Salesforce's configurable rule-engine model (see `.devclaw/research/notifications.md` §Rejected A).
-- `INotificationDispatcher` lives at the Domain boundary; the concrete implementation sits in Infrastructure. Endpoint handlers call it post-SaveChanges; the dispatcher does a second SaveChanges (eventual consistency, acceptable for informational notifications). Background `DealRottingNotificationJob` uses a 24-hour deduplication guard (`COUNT(*) WHERE DealId=? AND Trigger=DealRotting AND CreatedAt > now()-24h`) to prevent repeated firing on the same stale deal.
+- `INotificationDispatcher` lives at the Domain boundary; the concrete implementation sits in Infrastructure. Endpoint handlers call it post-SaveChanges; the dispatcher does a second SaveChanges (eventual consistency, acceptable for informational notifications).
 - `@mention` syntax in `Activity.Note` is parsed in the application (endpoint) layer, not in the `Activity` domain entity — the entity stays `string?`-typed; mention resolution is an application concern injected via `INotificationDispatcher.ActivityMentionAsync`. Email/SMS fallback delivery was explicitly deferred (see `.devclaw/research/notifications.md` §Rejected D).
