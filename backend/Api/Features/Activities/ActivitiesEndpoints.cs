@@ -56,7 +56,8 @@ public static class ActivitiesEndpoints
             activity.OccurredAt,
             activity.ContactId,
             activity.CompanyId,
-            activity.DealId);
+            activity.DealId,
+            mentionedUserIds);
 
         return Results.Created($"/activities/{activity.Id}", response);
     }

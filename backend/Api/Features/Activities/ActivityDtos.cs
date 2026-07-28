@@ -17,4 +17,5 @@ public sealed record ActivityResponse(
     DateTime OccurredAt,
     Guid? ContactId,
     Guid? CompanyId,
-    Guid? DealId);
+    Guid? DealId,
+    IReadOnlyList<Guid> MentionedUserIds);

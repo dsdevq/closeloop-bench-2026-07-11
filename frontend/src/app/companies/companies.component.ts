@@ -83,6 +83,7 @@ export class CompaniesComponent implements OnInit {
       name,
       domain: domain || null,
       industry: industry || null,
+      // MVP placeholder: replace with authenticated user ID once auth layer exists (see AGENTS.md)
       ownerId: '00000000-0000-0000-0000-000000000001',
     }).subscribe({
       next: () => {

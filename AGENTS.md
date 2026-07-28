@@ -87,6 +87,29 @@ A multi-stage root `Dockerfile` builds the full stack:
 2. **dotnet-build** — `mcr.microsoft.com/dotnet/sdk:9.0.315` (exact version from `global.json`); restores and publishes `backend/Api/Api.csproj` to `/publish`.
 3. **runtime** — `mcr.microsoft.com/dotnet/aspnet:9.0`; copies published API + Angular bundle into `wwwroot/`.
 
+### MVP scope decisions — named deferrals
+
+**Angular UI for Deals, Pipelines, Activities, and Notifications is intentionally absent.**
+The backend API endpoints for all four features are shipped (REST handlers, DTOs, EF Core
+persistence, notification dispatch), but no Angular components, routes, or services exist for
+them yet. `frontend/src/app/` contains only `contacts/` and `companies/` components. This is a
+documented MVP deferral, not an oversight — the UI work for these features is a separate,
+larger follow-up. Do not add Angular UI for these features without a dedicated scope decision.
+
+**Hardcoded `ownerId` in `companies.component.ts` and `contacts.component.ts`** — both POST
+forms send `ownerId: '00000000-0000-0000-0000-000000000001'` as a hardcoded placeholder because
+no authentication or owner-resolution mechanism exists yet. This is a temporary MVP stub; the
+correct fix is to supply a real owner ID from the authenticated session once auth is added.
+See the auth note below.
+
+**No authentication or identity layer exists.** The API is fully unauthenticated. User identity
+is not verified server-side — the `ownerId` in contact/company/deal create requests is accepted
+as-is from the client body. `GET /notifications` and notification ownership checks also use a
+`userId` query parameter supplied by the caller with no verification. **Before building any
+user-scoped feature** (notifications inbox, per-user dashboards, assignment rules), an auth
+layer must be added to replace the stub `ownerId` approach. Options: ASP.NET Core JWT bearer
+middleware, session cookie, or a thin identity proxy in front of the API.
+
 ### Intentionally deferred endpoints
 
 `GET /activities` is **not implemented**. The write side (`POST /activities`) is live; the read
@@ -99,11 +122,14 @@ activity log). Do not add a GET handler without first updating this note and the
 `backend/Tests/Domain/DealTests.cs` and `backend/Tests/Domain/PipelineTests.cs` were the legacy
 duplicate test files. They have been deleted; their tests now live canonically in
 `backend/Domain.Tests/Entities/DealTests.cs` and `backend/Domain.Tests/Entities/PipelineTests.cs`.
-The `backend/Tests/Tests.csproj` project remains in the solution but is now empty (no source files).
 
 `backend/Tests/Api/ContactsEndpointsTests.cs` was deleted earlier (its 4 tests were ported into
 `backend/Api.Tests/Features/Contacts/ContactsEndpointsTests.cs` with their original method names
 before deletion, to satisfy the test-integrity gate).
+
+The `backend/Tests/` directory and its empty `Tests.csproj` have been fully removed from the
+repository and from `closeloop.sln`. No source files were ever migrated out — the project was
+always empty after the duplicate test files were deleted.
 
 ### Docker — deploy gesture
 
