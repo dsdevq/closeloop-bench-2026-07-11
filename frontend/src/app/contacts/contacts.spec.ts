@@ -62,6 +62,7 @@ describe('ContactsComponent', () => {
       email: 'carol@example.com',
       phone: null,
       companyId: null,
+      ownerId: '00000000-0000-0000-0000-000000000001',
     });
     postReq.flush(carol);
 

@@ -9,6 +9,7 @@ export interface ContactResponse {
   email: string;
   phone: string | null;
   companyId: string | null;
+  ownerId: string;
 }
 
 export interface CreateContactRequest {
@@ -16,6 +17,7 @@ export interface CreateContactRequest {
   email: string;
   phone: string | null;
   companyId: string | null;
+  ownerId: string;
 }
 
 @Injectable({ providedIn: 'root' })
