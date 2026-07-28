@@ -102,16 +102,17 @@ gap is fixed.**
 All four `INotificationDispatcher` methods in `Infrastructure/Services/NotificationDispatcher.cs`
 create real `Notification` rows and call `SaveChangesAsync`:
 
-| Method | Recipient | Trigger |
-|---|---|---|
-| `DealAssignedAsync` | `deal.OwnerId` (new owner) | `DealAssigned` |
-| `DealStageChangedAsync` | `deal.OwnerId` | `DealStageChanged` — title includes stage name |
-| `ContactAssignedAsync` | `contact.OwnerId` (new owner) | `ContactAssigned` |
-| `ActivityMentionAsync` | each mentioned user ID | `ActivityMention` |
+| Method | Recipient | Trigger | Caller |
+|---|---|---|---|
+| `DealAssignedAsync` | `deal.OwnerId` (new owner) | `DealAssigned` | `PATCH /deals/{id}/stage` (only when owner changes) |
+| `DealStageChangedAsync` | `deal.OwnerId` | `DealStageChanged` — title includes stage name | `PATCH /deals/{id}/stage` (always) |
+| `ContactAssignedAsync` | `contact.OwnerId` (new owner) | `ContactAssigned` | `PATCH /contacts/{id}/owner` (only when owner actually changes) |
+| `ActivityMentionAsync` | each mentioned user ID | `ActivityMention` | `POST /activities` |
 
-`ActivityMentionAsync` is called from `POST /activities`. The other three dispatcher methods are
-ready to be wired but currently have no PATCH endpoints that trigger them — that remains a
-known gap until ownership-change and stage-advance PATCH endpoints are added.
+All four dispatcher methods are now wired to real, reachable callers. The key guard: ownership-change
+dispatchers (`DealAssignedAsync`, `ContactAssignedAsync`) are only fired when the new owner differs
+from the previous owner — re-PATCHing with the same owner is a no-op that returns 200 without
+creating a spurious notification.
 
 `Pipeline.RottingThresholdDays` (`int?`) **is implemented** in the domain entity and EF configuration
 but has no consumer: the `DealRottingNotificationJob` background hosted service was deleted as
@@ -156,12 +157,11 @@ and three API endpoints (`GET /notifications`, `PATCH /notifications/{id}/read`,
 rule engine, HubSpot's webhook-first push model, Attio's record-following subscription, and
 Pipedrive's email fallback are all explicitly rejected (see artifact for argued reasoning).
 
-**Current wiring state**: `ActivityMentionAsync` is called from `POST /activities` after
-`SaveChanges` — the only dispatcher method currently integrated into a real endpoint. The other
-three methods (`DealAssignedAsync`, `DealStageChangedAsync`, `ContactAssignedAsync`) are no-op
-stubs in `NotificationDispatcher`; `Deal.OwnerId` and `Contact.OwnerId` now exist in the domain
-model (migration `AddOwnerAndDealFields`), but the PATCH endpoints that change ownership/stage
-have not been implemented yet (see Known Gaps below).
+**Current wiring state**: All four dispatcher methods are integrated. `PATCH /deals/{id}/stage`
+fires `DealStageChangedAsync` (always) and `DealAssignedAsync` (only when `req.OwnerId` differs
+from the current owner). `PATCH /contacts/{id}/owner` fires `ContactAssignedAsync` (only when
+`req.OwnerId != contact.OwnerId` — same-owner PATCH is a no-op). `POST /activities` fires
+`ActivityMentionAsync` after `SaveChanges`.
 
 ## Domain entity conventions
 
