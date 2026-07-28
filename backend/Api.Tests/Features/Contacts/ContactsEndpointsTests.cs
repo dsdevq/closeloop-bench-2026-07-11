@@ -64,7 +64,8 @@ public sealed class ContactsEndpointsTests : IDisposable
     [Fact]
     public async Task PostContact_ValidRequest_Returns201WithCreatedResource()
     {
-        var req = new CreateContactRequest("Alice Smith", "alice@example.com", "+1-555-0101", null);
+        var ownerId = Guid.NewGuid();
+        var req = new CreateContactRequest("Alice Smith", "alice@example.com", "+1-555-0101", null, ownerId);
 
         var response = await _client.PostAsJsonAsync("/contacts", req);
 
@@ -76,12 +77,14 @@ public sealed class ContactsEndpointsTests : IDisposable
         Assert.Equal("alice@example.com", body.Email);
         Assert.Equal("+1-555-0101", body.Phone);
         Assert.Null(body.CompanyId);
+        Assert.Equal(ownerId, body.OwnerId);
     }
 
     [Fact]
     public async Task CreateThenGet_RoundTrip_ReturnsSameContact()
     {
-        var req = new CreateContactRequest("Bob Jones", "bob@example.com", null, null);
+        var ownerId = Guid.NewGuid();
+        var req = new CreateContactRequest("Bob Jones", "bob@example.com", null, null, ownerId);
         var createResponse = await _client.PostAsJsonAsync("/contacts", req);
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
         var created = await createResponse.Content.ReadFromJsonAsync<ContactResponse>();
@@ -109,7 +112,7 @@ public sealed class ContactsEndpointsTests : IDisposable
     [Fact]
     public async Task PostContact_BlankName_Returns422ValidationProblem()
     {
-        var req = new CreateContactRequest("", "valid@example.com", null, null);
+        var req = new CreateContactRequest("", "valid@example.com", null, null, Guid.NewGuid());
 
         var response = await _client.PostAsJsonAsync("/contacts", req);
 
@@ -119,7 +122,17 @@ public sealed class ContactsEndpointsTests : IDisposable
     [Fact]
     public async Task PostContact_InvalidEmail_Returns422ValidationProblem()
     {
-        var req = new CreateContactRequest("Valid Name", "not-an-email", null, null);
+        var req = new CreateContactRequest("Valid Name", "not-an-email", null, null, Guid.NewGuid());
+
+        var response = await _client.PostAsJsonAsync("/contacts", req);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PostContact_EmptyOwnerId_Returns422ValidationProblem()
+    {
+        var req = new CreateContactRequest("Valid Name", "valid@example.com", null, null, Guid.Empty);
 
         var response = await _client.PostAsJsonAsync("/contacts", req);
 
@@ -129,8 +142,8 @@ public sealed class ContactsEndpointsTests : IDisposable
     [Fact]
     public async Task GetContacts_AfterCreatingTwo_ReturnsBothContacts()
     {
-        await _client.PostAsJsonAsync("/contacts", new CreateContactRequest("Carol", "carol@example.com", null, null));
-        await _client.PostAsJsonAsync("/contacts", new CreateContactRequest("Dave", "dave@example.com", null, null));
+        await _client.PostAsJsonAsync("/contacts", new CreateContactRequest("Carol", "carol@example.com", null, null, Guid.NewGuid()));
+        await _client.PostAsJsonAsync("/contacts", new CreateContactRequest("Dave", "dave@example.com", null, null, Guid.NewGuid()));
 
         var response = await _client.GetAsync("/contacts");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

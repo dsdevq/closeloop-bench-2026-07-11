@@ -20,7 +20,7 @@ public static class ContactsEndpoints
     private static async Task<IResult> ListContacts(CrmDbContext db)
     {
         var contacts = await db.Contacts
-            .Select(c => new ContactResponse(c.Id, c.Name, c.Email, c.Phone, c.CompanyId))
+            .Select(c => new ContactResponse(c.Id, c.Name, c.Email, c.Phone, c.CompanyId, c.OwnerId))
             .ToListAsync();
         return Results.Ok(contacts);
     }
@@ -29,7 +29,7 @@ public static class ContactsEndpoints
     {
         var contact = await db.Contacts
             .Where(c => c.Id == id)
-            .Select(c => new ContactResponse(c.Id, c.Name, c.Email, c.Phone, c.CompanyId))
+            .Select(c => new ContactResponse(c.Id, c.Name, c.Email, c.Phone, c.CompanyId, c.OwnerId))
             .SingleOrDefaultAsync();
 
         return contact is null ? Results.NotFound() : Results.Ok(contact);
@@ -40,7 +40,7 @@ public static class ContactsEndpoints
         Contact contact;
         try
         {
-            contact = Contact.Create(req.Name, req.Email, req.Phone, req.CompanyId);
+            contact = Contact.Create(req.Name, req.Email, req.Phone, req.CompanyId, req.OwnerId);
         }
         catch (ArgumentException ex)
         {
@@ -52,7 +52,7 @@ public static class ContactsEndpoints
         db.Contacts.Add(contact);
         await db.SaveChangesAsync();
 
-        var response = new ContactResponse(contact.Id, contact.Name, contact.Email, contact.Phone, contact.CompanyId);
+        var response = new ContactResponse(contact.Id, contact.Name, contact.Email, contact.Phone, contact.CompanyId, contact.OwnerId);
         return Results.Created($"/contacts/{contact.Id}", response);
     }
 }

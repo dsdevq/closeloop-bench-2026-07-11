@@ -10,7 +10,10 @@ internal sealed class DealConfiguration : IEntityTypeConfiguration<Deal>
     {
         builder.ToTable("deals");
         builder.HasKey(d => d.Id);
+        builder.Property(d => d.Title).IsRequired().HasMaxLength(200);
         builder.Property(d => d.Amount).IsRequired().HasPrecision(18, 4);
+        builder.Property(d => d.CloseDate);
+        builder.Property(d => d.OwnerId).IsRequired();
 
         builder.HasOne<Pipeline>()
             .WithMany()

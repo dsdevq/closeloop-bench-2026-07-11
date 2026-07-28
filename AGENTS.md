@@ -39,14 +39,16 @@ backend/
     CrmDbContext.cs                         EF Core DbContext (6 DbSets)
     CrmDbContextFactory.cs                  IDesignTimeDbContextFactory — env-sourced conn string for migrations
     Configurations/ IEntityTypeConfiguration<T> per aggregate (applied via ApplyConfigurationsFromAssembly)
-    Migrations/     EF Core migrations (InitialCreate) — generated, not executed at build time
+    Migrations/     EF Core migrations (InitialCreate, AddNotifications, AddOwnerAndDealFields) — generated, not executed at build time
   Infrastructure.Tests/ Infrastructure.Tests.csproj  xUnit — refs Infrastructure + EF Core InMemory
     CrmDbContextModelTests.cs              exercises OnModelCreating; asserts FK/cascade semantics
   Api/              Api.csproj              web app   — refs Infrastructure
         Program.cs  minimal API host + CrmDbContext DI registration (Npgsql)
     Features/
-      Contacts/     ContactsEndpoints.cs, ContactDtos.cs  (GET list/detail, POST create)
+      Contacts/     ContactsEndpoints.cs, ContactDtos.cs  (GET list/detail, POST create) — includes OwnerId
       Companies/    CompaniesEndpoints.cs, CompanyDtos.cs (GET list/detail, POST create)
+      Deals/        DealsEndpoints.cs, DealDtos.cs        (GET list/detail, POST create)
+      Pipelines/    PipelinesEndpoints.cs, PipelineDtos.cs (GET list/detail, POST create with stages)
 ```
 
 ## Clean-architecture layering
@@ -102,14 +104,15 @@ Three of the four `INotificationDispatcher` methods are **no-op stubs** in
 
 | Method | Blocked on |
 |---|---|
-| `DealAssignedAsync` | `Deal.OwnerId` field not yet in domain model |
-| `DealStageChangedAsync` | `Deal.OwnerId` field not yet in domain model |
-| `ContactAssignedAsync` | `Contact.OwnerId` field not yet in domain model |
+| `DealAssignedAsync` | PATCH endpoint for ownership change (field exists; dispatcher not wired) |
+| `DealStageChangedAsync` | PATCH endpoint for stage change (field exists; dispatcher not wired) |
+| `ContactAssignedAsync` | PATCH endpoint for ownership change (field exists; dispatcher not wired) |
 
-Until `Deal.OwnerId` and `Contact.OwnerId` are added (plus the PATCH endpoints that change
-ownership), these methods return `Task.CompletedTask` without creating any notification records.
-`ActivityMentionAsync` is the only dispatcher method fully wired to a real endpoint
-(`POST /activities`).
+`Deal.OwnerId`, `Deal.Title`, `Deal.CloseDate`, and `Contact.OwnerId` are now present in the
+domain entities and backed by the `AddOwnerAndDealFields` migration. Until PATCH endpoints for
+ownership/stage changes are added and the dispatcher methods are wired to those endpoints, these
+three methods return `Task.CompletedTask`. `ActivityMentionAsync` is the only dispatcher method
+fully wired to a real endpoint (`POST /activities`).
 
 `Pipeline.RottingThresholdDays` (`int?`) **is implemented** in the domain entity and EF configuration
 but has no consumer: the `DealRottingNotificationJob` background hosted service was deleted as
@@ -157,8 +160,9 @@ Pipedrive's email fallback are all explicitly rejected (see artifact for argued 
 **Current wiring state**: `ActivityMentionAsync` is called from `POST /activities` after
 `SaveChanges` — the only dispatcher method currently integrated into a real endpoint. The other
 three methods (`DealAssignedAsync`, `DealStageChangedAsync`, `ContactAssignedAsync`) are no-op
-stubs in `NotificationDispatcher` pending `Deal.OwnerId` and `Contact.OwnerId` fields, which are
-not yet in the domain model (see Known Gaps below).
+stubs in `NotificationDispatcher`; `Deal.OwnerId` and `Contact.OwnerId` now exist in the domain
+model (migration `AddOwnerAndDealFields`), but the PATCH endpoints that change ownership/stage
+have not been implemented yet (see Known Gaps below).
 
 ## Domain entity conventions
 

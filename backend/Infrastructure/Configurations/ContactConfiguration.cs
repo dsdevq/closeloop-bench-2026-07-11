@@ -13,6 +13,7 @@ internal sealed class ContactConfiguration : IEntityTypeConfiguration<Contact>
         builder.Property(c => c.Name).IsRequired().HasMaxLength(200);
         builder.Property(c => c.Email).IsRequired().HasMaxLength(320);
         builder.Property(c => c.Phone).HasMaxLength(50);
+        builder.Property(c => c.OwnerId).IsRequired();
 
         builder.HasOne<Company>()
             .WithMany()

@@ -1,7 +1,9 @@
 using Api.Features.Activities;
 using Api.Features.Companies;
 using Api.Features.Contacts;
+using Api.Features.Deals;
 using Api.Features.Notifications;
+using Api.Features.Pipelines;
 using Domain.Interfaces;
 using Infrastructure;
 using Infrastructure.Services;
@@ -24,6 +26,8 @@ var app = builder.Build();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 app.MapContactsEndpoints();
 app.MapCompaniesEndpoints();
+app.MapDealsEndpoints();
+app.MapPipelinesEndpoints();
 app.MapActivitiesEndpoints();
 app.MapNotificationsEndpoints();
 

@@ -21,7 +21,7 @@ public sealed class DealTests
         otherPipeline.AddStage("Review", order: 0);
         var foreignStage = otherPipeline.Stages[0];
 
-        var deal = Deal.Create(500m, pipeline.Id, stage.Id);
+        var deal = Deal.Create("Deal", 500m, Guid.NewGuid(), pipeline.Id, stage.Id);
 
         var ex = Assert.Throws<ArgumentException>(() => deal.AdvanceTo(foreignStage));
 
@@ -35,7 +35,7 @@ public sealed class DealTests
         pipeline.AddStage("Qualified", order: 1);
         var secondStage = pipeline.Stages[1];
 
-        var deal = Deal.Create(500m, pipeline.Id, firstStage.Id);
+        var deal = Deal.Create("Deal", 500m, Guid.NewGuid(), pipeline.Id, firstStage.Id);
 
         deal.AdvanceTo(secondStage);
 
@@ -49,7 +49,7 @@ public sealed class DealTests
         pipeline.AddStage("Qualified", order: 1);
         var secondStage = pipeline.Stages[1];
 
-        var deal = Deal.Create(500m, pipeline.Id, firstStage.Id);
+        var deal = Deal.Create("Deal", 500m, Guid.NewGuid(), pipeline.Id, firstStage.Id);
 
         deal.AdvanceTo(secondStage);
 
@@ -65,7 +65,7 @@ public sealed class DealTests
         pipeline.AddStage("Closing", order: 2);
 
         var stages = pipeline.Stages;
-        var deal = Deal.Create(1000m, pipeline.Id, stages[0].Id);
+        var deal = Deal.Create("Big Deal", 1000m, Guid.NewGuid(), pipeline.Id, stages[0].Id);
 
         deal.AdvanceTo(stages[1]);
         Assert.Equal(stages[1].Id, deal.PipelineStageId);

@@ -5,10 +5,12 @@ public sealed record ContactResponse(
     string Name,
     string Email,
     string? Phone,
-    Guid? CompanyId);
+    Guid? CompanyId,
+    Guid OwnerId);
 
 public sealed record CreateContactRequest(
     string Name,
     string Email,
     string? Phone,
-    Guid? CompanyId);
+    Guid? CompanyId,
+    Guid OwnerId);

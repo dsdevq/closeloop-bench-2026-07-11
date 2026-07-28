@@ -44,7 +44,7 @@ public sealed class ContactsEndpointsTests : IDisposable
     [Fact]
     public async Task PostContact_ThenGetById_RoundTrip_ReturnsSameContact()
     {
-        var req = new CreateContactRequest("Alice Smith", "alice@example.com", "+1-555-0101", null);
+        var req = new CreateContactRequest("Alice Smith", "alice@example.com", "+1-555-0101", null, Guid.NewGuid());
         var createResponse = await _client.PostAsJsonAsync("/contacts", req);
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
         var created = await createResponse.Content.ReadFromJsonAsync<ContactResponse>();
@@ -66,8 +66,8 @@ public sealed class ContactsEndpointsTests : IDisposable
     [Fact]
     public async Task GetContacts_AfterCreatingContacts_ReturnsList()
     {
-        await _client.PostAsJsonAsync("/contacts", new CreateContactRequest("Bob Jones", "bob@example.com", null, null));
-        await _client.PostAsJsonAsync("/contacts", new CreateContactRequest("Carol White", "carol@example.com", null, null));
+        await _client.PostAsJsonAsync("/contacts", new CreateContactRequest("Bob Jones", "bob@example.com", null, null, Guid.NewGuid()));
+        await _client.PostAsJsonAsync("/contacts", new CreateContactRequest("Carol White", "carol@example.com", null, null, Guid.NewGuid()));
 
         var response = await _client.GetAsync("/contacts");
 
@@ -88,7 +88,7 @@ public sealed class ContactsEndpointsTests : IDisposable
     [Fact]
     public async Task PostContact_MissingName_Returns422UnprocessableEntity()
     {
-        var req = new CreateContactRequest("", "valid@example.com", null, null);
+        var req = new CreateContactRequest("", "valid@example.com", null, null, Guid.NewGuid());
 
         var response = await _client.PostAsJsonAsync("/contacts", req);
 

@@ -21,7 +21,7 @@ public sealed class CrmPersistenceTests
     [Fact]
     public async Task Contact_WithoutCompany_PersistsAndReloads()
     {
-        var contact = Contact.Create("Alice Smith", "alice@example.com", null, null);
+        var contact = Contact.Create("Alice Smith", "alice@example.com", null, null, Guid.NewGuid());
 
         await using var write = CreateContext();
         write.Contacts.Add(contact);
@@ -41,7 +41,7 @@ public sealed class CrmPersistenceTests
     {
         var owner = Guid.NewGuid();
         var company = Company.Create("Acme Corp", "acme.com", "Technology", owner);
-        var contact = Contact.Create("Bob Jones", "bob@acme.com", null, company.Id);
+        var contact = Contact.Create("Bob Jones", "bob@acme.com", null, company.Id, Guid.NewGuid());
 
         await using var write = CreateContext();
         write.Companies.Add(company);
@@ -88,7 +88,7 @@ public sealed class CrmPersistenceTests
         pipeline.AddStage("Discovery", 0, 20);
 
         var stage = pipeline.Stages[0];
-        var deal = Deal.Create(15_000m, pipeline.Id, stage.Id);
+        var deal = Deal.Create("Enterprise Deal", 15_000m, Guid.NewGuid(), pipeline.Id, stage.Id);
 
         await using var write = CreateContext();
         write.Pipelines.Add(pipeline);
@@ -113,7 +113,7 @@ public sealed class CrmPersistenceTests
 
         var leadStage = pipeline.Stages[0];
         var proposalStage = pipeline.Stages[1];
-        var deal = Deal.Create(5_000m, pipeline.Id, leadStage.Id);
+        var deal = Deal.Create("Proposal Deal", 5_000m, Guid.NewGuid(), pipeline.Id, leadStage.Id);
 
         // Advance before first save — AdvanceTo only mutates the FK, no DB interaction needed.
         deal.AdvanceTo(proposalStage);
@@ -133,7 +133,7 @@ public sealed class CrmPersistenceTests
     [Fact]
     public async Task Activity_AnchoredToContact_PersistsAndReloads()
     {
-        var contact = Contact.Create("Carol White", "carol@example.com", null, null);
+        var contact = Contact.Create("Carol White", "carol@example.com", null, null, Guid.NewGuid());
         var activity = Activity.Create(
             ActivityType.Call,
             "Introductory call",
@@ -187,7 +187,7 @@ public sealed class CrmPersistenceTests
     {
         var pipeline = Pipeline.Create("Growth Pipeline");
         pipeline.AddStage("Intro", 0);
-        var deal = Deal.Create(8_000m, pipeline.Id, pipeline.Stages[0].Id);
+        var deal = Deal.Create("Meeting Deal", 8_000m, Guid.NewGuid(), pipeline.Id, pipeline.Stages[0].Id);
         var activity = Activity.Create(
             ActivityType.Meeting,
             "Kick-off meeting",

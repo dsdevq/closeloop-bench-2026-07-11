@@ -162,7 +162,7 @@ public sealed class CompaniesEndpointsTests : IDisposable
         Assert.NotNull(company);
 
         var contactResp = await _client.PostAsJsonAsync("/contacts",
-            new Api.Features.Contacts.CreateContactRequest("Eve", "eve@linked.com", null, company.Id));
+            new Api.Features.Contacts.CreateContactRequest("Eve", "eve@linked.com", null, company.Id, Guid.NewGuid()));
         Assert.Equal(HttpStatusCode.Created, contactResp.StatusCode);
         var contact = await contactResp.Content.ReadFromJsonAsync<Api.Features.Contacts.ContactResponse>();
         Assert.NotNull(contact);

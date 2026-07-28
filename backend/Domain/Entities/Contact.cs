@@ -8,15 +8,18 @@ public sealed class Contact : Entity
     public string Email { get; private set; } = default!;
     public string? Phone { get; private set; }
     public Guid? CompanyId { get; private set; }
+    public Guid OwnerId { get; private set; }
 
     private Contact() { }
 
-    public static Contact Create(string name, string email, string? phone, Guid? companyId)
+    public static Contact Create(string name, string email, string? phone, Guid? companyId, Guid ownerId)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Contact name is required.", nameof(name));
         if (string.IsNullOrWhiteSpace(email))
             throw new ArgumentException("Email is required.", nameof(email));
+        if (ownerId == Guid.Empty)
+            throw new ArgumentException("OwnerId must not be empty.", nameof(ownerId));
 
         var trimmedEmail = email.Trim();
         if (!IsValidEmail(trimmedEmail))
@@ -29,6 +32,7 @@ public sealed class Contact : Entity
             Email = trimmedEmail,
             Phone = phone,
             CompanyId = companyId,
+            OwnerId = ownerId,
         };
     }
 
