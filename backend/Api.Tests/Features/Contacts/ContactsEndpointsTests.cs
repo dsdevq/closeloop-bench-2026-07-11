@@ -230,4 +230,58 @@ public sealed class ContactsEndpointsTests : IDisposable
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, patchResp.StatusCode);
     }
+
+    [Fact]
+    public async Task PostContact_ThenGetById_RoundTrip_ReturnsSameContact()
+    {
+        var req = new CreateContactRequest("Alice Smith", "alice@example.com", "+1-555-0101", null, Guid.NewGuid());
+        var createResponse = await _client.PostAsJsonAsync("/contacts", req);
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+        var created = await createResponse.Content.ReadFromJsonAsync<ContactResponse>();
+        Assert.NotNull(created);
+        Assert.NotEqual(Guid.Empty, created.Id);
+
+        var getResponse = await _client.GetAsync($"/contacts/{created.Id}");
+
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var fetched = await getResponse.Content.ReadFromJsonAsync<ContactResponse>();
+        Assert.NotNull(fetched);
+        Assert.Equal(created.Id, fetched.Id);
+        Assert.Equal("Alice Smith", fetched.Name);
+        Assert.Equal("alice@example.com", fetched.Email);
+        Assert.Equal("+1-555-0101", fetched.Phone);
+        Assert.Null(fetched.CompanyId);
+    }
+
+    [Fact]
+    public async Task GetContacts_AfterCreatingContacts_ReturnsList()
+    {
+        await _client.PostAsJsonAsync("/contacts", new CreateContactRequest("Bob Jones", "bob@example.com", null, null, Guid.NewGuid()));
+        await _client.PostAsJsonAsync("/contacts", new CreateContactRequest("Carol White", "carol@example.com", null, null, Guid.NewGuid()));
+
+        var response = await _client.GetAsync("/contacts");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ContactResponse[]>();
+        Assert.NotNull(body);
+        Assert.Equal(2, body.Length);
+    }
+
+    [Fact]
+    public async Task GetById_UnknownId_Returns404()
+    {
+        var response = await _client.GetAsync($"/contacts/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PostContact_MissingName_Returns422UnprocessableEntity()
+    {
+        var req = new CreateContactRequest("", "valid@example.com", null, null, Guid.NewGuid());
+
+        var response = await _client.PostAsJsonAsync("/contacts", req);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
 }

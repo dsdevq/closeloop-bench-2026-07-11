@@ -24,7 +24,6 @@ public static class PipelinesEndpoints
             .Select(p => new PipelineResponse(
                 p.Id,
                 p.Name,
-                p.RottingThresholdDays,
                 p.Stages.OrderBy(s => s.Order)
                     .Select(s => new PipelineStageResponse(s.Id, s.Name, s.Order, s.WinProbability))
                     .ToList()))
@@ -40,7 +39,6 @@ public static class PipelinesEndpoints
             .Select(p => new PipelineResponse(
                 p.Id,
                 p.Name,
-                p.RottingThresholdDays,
                 p.Stages.OrderBy(s => s.Order)
                     .Select(s => new PipelineStageResponse(s.Id, s.Name, s.Order, s.WinProbability))
                     .ToList()))
@@ -75,7 +73,6 @@ public static class PipelinesEndpoints
         var response = new PipelineResponse(
             pipeline.Id,
             pipeline.Name,
-            pipeline.RottingThresholdDays,
             pipeline.Stages
                 .Select(s => new PipelineStageResponse(s.Id, s.Name, s.Order, s.WinProbability))
                 .ToList());

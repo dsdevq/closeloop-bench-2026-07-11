@@ -9,7 +9,6 @@ public sealed record PipelineStageResponse(
 public sealed record PipelineResponse(
     Guid Id,
     string Name,
-    int? RottingThresholdDays,
     IReadOnlyList<PipelineStageResponse> Stages);
 
 public sealed record CreatePipelineRequest(

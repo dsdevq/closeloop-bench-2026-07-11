@@ -72,7 +72,7 @@ public sealed class NotificationsEndpointsTests : IDisposable
         var otherId = Guid.NewGuid();
 
         await SeedNotificationAsync(Notification.Create(userId, NotificationTrigger.ActivityMention, "Test title"));
-        await SeedNotificationAsync(Notification.Create(otherId, NotificationTrigger.DealRotting, "Other user"));
+        await SeedNotificationAsync(Notification.Create(otherId, NotificationTrigger.ContactAssigned, "Other user"));
 
         var response = await _client.GetAsync($"/notifications?userId={userId}&limit=50");
 
@@ -92,7 +92,7 @@ public sealed class NotificationsEndpointsTests : IDisposable
         var userId = Guid.NewGuid();
 
         var unread = Notification.Create(userId, NotificationTrigger.ActivityMention, "Unread");
-        var read = Notification.Create(userId, NotificationTrigger.DealRotting, "Read one");
+        var read = Notification.Create(userId, NotificationTrigger.ContactAssigned, "Read one");
         read.MarkRead();
 
         await SeedNotificationAsync(unread);
@@ -140,7 +140,7 @@ public sealed class NotificationsEndpointsTests : IDisposable
         var userId = Guid.NewGuid();
 
         await SeedNotificationAsync(Notification.Create(userId, NotificationTrigger.ActivityMention, "First"));
-        await SeedNotificationAsync(Notification.Create(userId, NotificationTrigger.DealRotting, "Second"));
+        await SeedNotificationAsync(Notification.Create(userId, NotificationTrigger.DealAssigned, "Second"));
 
         var response = await _client.PostAsync($"/notifications/read-all?userId={userId}", null);
 

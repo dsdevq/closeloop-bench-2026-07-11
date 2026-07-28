@@ -93,6 +93,10 @@ in PR #3. They are kept only because devclaw's test-integrity gate cannot curren
 prior-PR-audited equivalent on a deletion diff. **Do not delete these files until that harness
 gap is fixed.**
 
+`backend/Tests/Api/ContactsEndpointsTests.cs` was deleted (its 4 tests were ported into
+`backend/Api.Tests/Features/Contacts/ContactsEndpointsTests.cs` with their original method names
+before deletion, to satisfy the test-integrity gate).
+
 ### Known gaps / Docker
 
 **Static-file serving not wired** — `backend/Api/Program.cs` does not yet call `UseDefaultFiles()` + `UseStaticFiles()`. The Angular bundle is copied into `wwwroot/` in the image but the API does not serve it at runtime. When that hookup is added to Program.cs the frontend will be served from the same origin as the API (no separate server needed). Until then, `docker run` on this image exposes only the `/health` and `/contacts` API endpoints.
@@ -113,12 +117,6 @@ All four dispatcher methods are now wired to real, reachable callers. The key gu
 dispatchers (`DealAssignedAsync`, `ContactAssignedAsync`) are only fired when the new owner differs
 from the previous owner — re-PATCHing with the same owner is a no-op that returns 200 without
 creating a spurious notification.
-
-`Pipeline.RottingThresholdDays` (`int?`) **is implemented** in the domain entity and EF configuration
-but has no consumer: the `DealRottingNotificationJob` background hosted service was deleted as
-permanently dead code (it referenced `Deal.OwnerId` which does not exist). Until the ownership
-slice lands and the background job is re-introduced, `RottingThresholdDays` is an orphaned field
-that can be set via `Pipeline.SetRottingThresholdDays()` but never read by any job or endpoint.
 
 ## Research citation convention
 
@@ -148,8 +146,8 @@ them in. Do not omit or rename a section.
 
 The `notifications.md` artifact defines: `Notification` entity (`Id`, `RecipientUserId`, `Trigger`,
 `Title`, `Body`, `RelatedEntityId`, `RelatedEntityType`, `IsRead`, `CreatedAt`); `NotificationTrigger`
-enum (six values: `DealAssigned`, `DealStageChanged`, `DealRotting`, `ContactAssigned`,
-`ActivityMention`, `TaskDue`); `NotificationEntityType` enum (`Contact`, `Company`, `Deal`,
+enum (four values: `DealAssigned`=0, `DealStageChanged`=1, `ContactAssigned`=3, `ActivityMention`=4;
+`DealRotting`=2 and `TaskDue`=5 were removed as unconsumed — explicit int values kept to preserve DB mapping); `NotificationEntityType` enum (`Contact`, `Company`, `Deal`,
 `Activity`); `INotificationDispatcher` interface (four methods — one per event-driven trigger);
 and three API endpoints (`GET /notifications`, `PATCH /notifications/{id}/read`,
 `POST /notifications/read-all`). Design borrows from HubSpot's named-trigger taxonomy, Attio's
@@ -247,6 +245,6 @@ Also: `Results.ValidationProblem` must receive `statusCode: StatusCodes.Status42
 - `Pipeline._stages` is a `private readonly List<PipelineStage>` backing field. EF Core is told to use it via `Navigation(p => p.Stages).HasField("_stages").UsePropertyAccessMode(PropertyAccessMode.Field)` because the `Stages` getter returns a computed `IReadOnlyList` (OrderBy + ToList), not the field itself.
 - Activity anchor FKs (ContactId/CompanyId/DealId) use `DeleteBehavior.Restrict` — not SetNull — because nulling the sole anchor would silently violate the exactly-one-anchor domain invariant that Activity.Create enforces.
 - PipelineStage→Pipeline uses `DeleteBehavior.Cascade` (deleting a pipeline removes its stages). Deal→Pipeline and Deal→PipelineStage use `DeleteBehavior.Restrict` (cannot delete a pipeline or stage that has live deals).
-- `NotificationTrigger` is a closed enum (six values). A seventh trigger is an additive enum extension, not a rule-record migration — this was the explicit reason for rejecting Salesforce's configurable rule-engine model (see `.devclaw/research/notifications.md` §Rejected A).
+- `NotificationTrigger` is a closed enum (four values: DealAssigned, DealStageChanged, ContactAssigned, ActivityMention). Values carry explicit integers (0, 1, 3, 4) to preserve DB row mapping after `DealRotting`=2 and `TaskDue`=5 were deleted. A new trigger is an additive enum extension with an explicit next integer — this was the explicit reason for rejecting Salesforce's configurable rule-engine model (see `.devclaw/research/notifications.md` §Rejected A).
 - `INotificationDispatcher` lives at the Domain boundary; the concrete implementation sits in Infrastructure. `POST /activities` calls `ActivityMentionAsync` post-SaveChanges; the dispatcher does a second SaveChanges (eventual consistency, acceptable for informational notifications). All four dispatcher methods create real `Notification` rows; `DealAssignedAsync`, `DealStageChangedAsync`, and `ContactAssignedAsync` are implemented but not yet wired to any endpoint (no PATCH for ownership/stage change exists yet).
 - `@mention` syntax in `Activity.Note` is parsed in the application (endpoint) layer, not in the `Activity` domain entity — the entity stays `string?`-typed; mention resolution is an application concern injected via `INotificationDispatcher.ActivityMentionAsync`. Pattern: `@<uuid>` (UUID rather than display name). Email/SMS fallback delivery was explicitly deferred (see `.devclaw/research/notifications.md` §Rejected D).

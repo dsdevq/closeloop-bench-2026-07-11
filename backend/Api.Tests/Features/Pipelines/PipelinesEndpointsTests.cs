@@ -67,7 +67,6 @@ public sealed class PipelinesEndpointsTests : IDisposable
         Assert.NotEqual(Guid.Empty, body.Id);
         Assert.Equal("Sales Pipeline", body.Name);
         Assert.Empty(body.Stages);
-        Assert.Null(body.RottingThresholdDays);
     }
 
     [Fact]
