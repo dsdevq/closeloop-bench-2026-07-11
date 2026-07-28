@@ -193,4 +193,20 @@ public sealed class DealTests
 
         Assert.Equal("stage", ex.ParamName);
     }
+
+    [Fact]
+    public void AdvanceTo_StageOutsidePipeline_Throws()
+    {
+        var (pipeline, stage) = MakePipelineWithStage();
+
+        var otherPipeline = Pipeline.Create("Renewal");
+        otherPipeline.AddStage("Review", order: 0);
+        var foreignStage = otherPipeline.Stages[0];
+
+        var deal = MakeDeal(pipeline, stage);
+
+        var ex = Assert.Throws<ArgumentException>(() => deal.AdvanceTo(foreignStage));
+
+        Assert.Equal("stage", ex.ParamName);
+    }
 }

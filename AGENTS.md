@@ -87,15 +87,21 @@ A multi-stage root `Dockerfile` builds the full stack:
 2. **dotnet-build** — `mcr.microsoft.com/dotnet/sdk:9.0.315` (exact version from `global.json`); restores and publishes `backend/Api/Api.csproj` to `/publish`.
 3. **runtime** — `mcr.microsoft.com/dotnet/aspnet:9.0`; copies published API + Angular bundle into `wwwroot/`.
 
-### Known gaps / Temporary duplicate test files
+### Intentionally deferred endpoints
 
-`backend/Tests/Domain/DealTests.cs` and `backend/Tests/Domain/PipelineTests.cs` are intentionally
-retained dead weight. Their audited, fully-ported equivalents were merged into `backend/Domain.Tests/`
-in PR #3. They are kept only because devclaw's test-integrity gate cannot currently credit a
-prior-PR-audited equivalent on a deletion diff. **Do not delete these files until that harness
-gap is fixed.**
+`GET /activities` is **not implemented**. The write side (`POST /activities`) is live; the read
+feed is deferred pending decisions on filtering/pagination shape (per-record feed vs. global
+activity log). Do not add a GET handler without first updating this note and the research artifact
+(`.devclaw/research/activities.md`).
 
-`backend/Tests/Api/ContactsEndpointsTests.cs` was deleted (its 4 tests were ported into
+### Deduplication of legacy Tests project
+
+`backend/Tests/Domain/DealTests.cs` and `backend/Tests/Domain/PipelineTests.cs` were the legacy
+duplicate test files. They have been deleted; their tests now live canonically in
+`backend/Domain.Tests/Entities/DealTests.cs` and `backend/Domain.Tests/Entities/PipelineTests.cs`.
+The `backend/Tests/Tests.csproj` project remains in the solution but is now empty (no source files).
+
+`backend/Tests/Api/ContactsEndpointsTests.cs` was deleted earlier (its 4 tests were ported into
 `backend/Api.Tests/Features/Contacts/ContactsEndpointsTests.cs` with their original method names
 before deletion, to satisfy the test-integrity gate).
 

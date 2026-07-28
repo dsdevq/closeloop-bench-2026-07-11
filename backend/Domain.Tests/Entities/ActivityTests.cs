@@ -83,4 +83,14 @@ public sealed class ActivityTests
 
         Assert.NotEqual(a.Id, b.Id);
     }
+
+    [Fact]
+    public void Create_WithNullNote_NoteBecomesEmpty()
+    {
+        var contactId = Guid.NewGuid();
+
+        var activity = Activity.Create(ActivityType.Note, null!, _now, contactId: contactId);
+
+        Assert.Equal(string.Empty, activity.Note);
+    }
 }

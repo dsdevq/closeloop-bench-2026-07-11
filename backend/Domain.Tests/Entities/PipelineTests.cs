@@ -177,4 +177,18 @@ public sealed class PipelineTests
 
         Assert.Equal("winProbability", ex.ParamName);
     }
+
+    [Fact]
+    public void Stages_AreReturnedInAscendingOrderByOrderField_RegardlessOfInsertionSequence()
+    {
+        var pipeline = Pipeline.Create("Sales");
+        pipeline.AddStage("Stage C", order: 2);
+        pipeline.AddStage("Stage A", order: 0);
+        pipeline.AddStage("Stage B", order: 1);
+
+        var orders = pipeline.Stages.Select(s => s.Order).ToArray();
+
+        Assert.Equal(new[] { 0, 1, 2 }, orders);
+        Assert.Equal(new[] { "Stage A", "Stage B", "Stage C" }, pipeline.Stages.Select(s => s.Name).ToArray());
+    }
 }
