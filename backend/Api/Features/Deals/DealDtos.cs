@@ -20,3 +20,5 @@ public sealed record CreateDealRequest(
     DateOnly? CloseDate = null,
     Guid? CompanyId = null,
     Guid? ContactId = null);
+
+public sealed record PatchDealStageRequest(Guid StageId, Guid? OwnerId = null);

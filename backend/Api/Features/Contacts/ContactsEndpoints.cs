@@ -1,4 +1,5 @@
 using Domain.Entities;
+using Domain.Interfaces;
 using Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,6 +14,7 @@ public static class ContactsEndpoints
         group.MapGet("/", ListContacts);
         group.MapGet("/{id:guid}", GetContact);
         group.MapPost("/", CreateContact);
+        group.MapPatch("/{id:guid}/owner", PatchContactOwner);
 
         return app;
     }
@@ -54,5 +56,37 @@ public static class ContactsEndpoints
 
         var response = new ContactResponse(contact.Id, contact.Name, contact.Email, contact.Phone, contact.CompanyId, contact.OwnerId);
         return Results.Created($"/contacts/{contact.Id}", response);
+    }
+
+    private static async Task<IResult> PatchContactOwner(
+        Guid id,
+        PatchContactOwnerRequest req,
+        CrmDbContext db,
+        INotificationDispatcher dispatcher,
+        CancellationToken ct)
+    {
+        var contact = await db.Contacts.Where(c => c.Id == id).SingleOrDefaultAsync(ct);
+        if (contact is null)
+            return Results.NotFound();
+
+        var previousOwnerId = contact.OwnerId;
+        if (req.OwnerId == previousOwnerId)
+            return Results.Ok(new ContactResponse(contact.Id, contact.Name, contact.Email, contact.Phone, contact.CompanyId, contact.OwnerId));
+
+        try
+        {
+            contact.AssignOwnerTo(req.OwnerId);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]> { [ex.ParamName ?? "ownerId"] = [ex.Message] },
+                statusCode: StatusCodes.Status422UnprocessableEntity);
+        }
+
+        await db.SaveChangesAsync(ct);
+        await dispatcher.ContactAssignedAsync(contact, previousOwnerId, ct);
+
+        return Results.Ok(new ContactResponse(contact.Id, contact.Name, contact.Email, contact.Phone, contact.CompanyId, contact.OwnerId));
     }
 }

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Api.Features.Contacts;
+using Domain.Entities;
 using Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -150,5 +151,83 @@ public sealed class ContactsEndpointsTests : IDisposable
         var body = await response.Content.ReadFromJsonAsync<ContactResponse[]>();
         Assert.NotNull(body);
         Assert.Equal(2, body.Length);
+    }
+
+    [Fact]
+    public async Task PatchContactOwner_NewOwner_Returns200AndFiresContactAssignedNotification()
+    {
+        var originalOwnerId = Guid.NewGuid();
+        var newOwnerId = Guid.NewGuid();
+        var createResp = await _client.PostAsJsonAsync("/contacts",
+            new CreateContactRequest("Eve Adams", "eve@example.com", null, null, originalOwnerId));
+        Assert.Equal(HttpStatusCode.Created, createResp.StatusCode);
+        var contact = await createResp.Content.ReadFromJsonAsync<ContactResponse>();
+        Assert.NotNull(contact);
+
+        var patchResp = await _client.PatchAsJsonAsync($"/contacts/{contact.Id}/owner",
+            new PatchContactOwnerRequest(newOwnerId));
+
+        Assert.Equal(HttpStatusCode.OK, patchResp.StatusCode);
+        var body = await patchResp.Content.ReadFromJsonAsync<ContactResponse>();
+        Assert.NotNull(body);
+        Assert.Equal(newOwnerId, body.OwnerId);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
+        var notifications = await db.Notifications.ToListAsync();
+        Assert.Single(notifications);
+        Assert.Equal(NotificationTrigger.ContactAssigned, notifications[0].Trigger);
+        Assert.Equal(newOwnerId, notifications[0].RecipientUserId);
+        Assert.Equal(contact.Id, notifications[0].RelatedEntityId);
+    }
+
+    [Fact]
+    public async Task PatchContactOwner_SameOwner_Returns200AndNoNotificationCreated()
+    {
+        var ownerId = Guid.NewGuid();
+        var createResp = await _client.PostAsJsonAsync("/contacts",
+            new CreateContactRequest("Frank Brown", "frank@example.com", null, null, ownerId));
+        Assert.Equal(HttpStatusCode.Created, createResp.StatusCode);
+        var contact = await createResp.Content.ReadFromJsonAsync<ContactResponse>();
+        Assert.NotNull(contact);
+
+        // PATCH with the same owner — must not create a spurious notification
+        var patchResp = await _client.PatchAsJsonAsync($"/contacts/{contact.Id}/owner",
+            new PatchContactOwnerRequest(ownerId));
+
+        Assert.Equal(HttpStatusCode.OK, patchResp.StatusCode);
+        var body = await patchResp.Content.ReadFromJsonAsync<ContactResponse>();
+        Assert.NotNull(body);
+        Assert.Equal(ownerId, body.OwnerId);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
+        var notifications = await db.Notifications.ToListAsync();
+        Assert.Empty(notifications);
+    }
+
+    [Fact]
+    public async Task PatchContactOwner_UnknownContact_Returns404()
+    {
+        var patchResp = await _client.PatchAsJsonAsync($"/contacts/{Guid.NewGuid()}/owner",
+            new PatchContactOwnerRequest(Guid.NewGuid()));
+
+        Assert.Equal(HttpStatusCode.NotFound, patchResp.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchContactOwner_EmptyOwnerId_Returns422()
+    {
+        var ownerId = Guid.NewGuid();
+        var createResp = await _client.PostAsJsonAsync("/contacts",
+            new CreateContactRequest("Grace Hall", "grace@example.com", null, null, ownerId));
+        Assert.Equal(HttpStatusCode.Created, createResp.StatusCode);
+        var contact = await createResp.Content.ReadFromJsonAsync<ContactResponse>();
+        Assert.NotNull(contact);
+
+        var patchResp = await _client.PatchAsJsonAsync($"/contacts/{contact.Id}/owner",
+            new PatchContactOwnerRequest(Guid.Empty));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, patchResp.StatusCode);
     }
 }

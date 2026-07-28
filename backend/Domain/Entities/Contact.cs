@@ -36,6 +36,13 @@ public sealed class Contact : Entity
         };
     }
 
+    public void AssignOwnerTo(Guid newOwnerId)
+    {
+        if (newOwnerId == Guid.Empty)
+            throw new ArgumentException("OwnerId must not be empty.", nameof(newOwnerId));
+        OwnerId = newOwnerId;
+    }
+
     private static bool IsValidEmail(string email)
     {
         try

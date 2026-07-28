@@ -1,4 +1,5 @@
 using Domain.Entities;
+using Domain.Interfaces;
 using Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,6 +14,7 @@ public static class DealsEndpoints
         group.MapGet("/", ListDeals);
         group.MapGet("/{id:guid}", GetDeal);
         group.MapPost("/", CreateDeal);
+        group.MapPatch("/{id:guid}/stage", PatchDealStage);
 
         return app;
     }
@@ -68,5 +70,56 @@ public static class DealsEndpoints
             deal.Id, deal.Title, deal.Amount, deal.CloseDate, deal.OwnerId,
             deal.PipelineId, deal.PipelineStageId, deal.CompanyId, deal.ContactId);
         return Results.Created($"/deals/{deal.Id}", response);
+    }
+
+    private static async Task<IResult> PatchDealStage(
+        Guid id,
+        PatchDealStageRequest req,
+        CrmDbContext db,
+        INotificationDispatcher dispatcher,
+        CancellationToken ct)
+    {
+        var deal = await db.Deals.Where(d => d.Id == id).SingleOrDefaultAsync(ct);
+        if (deal is null)
+            return Results.NotFound();
+
+        var stage = await db.PipelineStages.Where(s => s.Id == req.StageId).SingleOrDefaultAsync(ct);
+        if (stage is null)
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]> { ["stageId"] = ["Stage not found."] },
+                statusCode: StatusCodes.Status422UnprocessableEntity);
+
+        var previousOwnerId = deal.OwnerId;
+        try
+        {
+            deal.AdvanceTo(stage);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]> { [ex.ParamName ?? "stage"] = [ex.Message] },
+                statusCode: StatusCodes.Status422UnprocessableEntity);
+        }
+
+        var ownerChanged = req.OwnerId.HasValue && req.OwnerId.Value != previousOwnerId;
+        if (ownerChanged)
+        {
+            try { deal.AssignOwner(req.OwnerId!.Value); }
+            catch (ArgumentException ex)
+            {
+                return Results.ValidationProblem(
+                    new Dictionary<string, string[]> { [ex.ParamName ?? "ownerId"] = [ex.Message] },
+                    statusCode: StatusCodes.Status422UnprocessableEntity);
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+        await dispatcher.DealStageChangedAsync(deal, stage, ct);
+        if (ownerChanged)
+            await dispatcher.DealAssignedAsync(deal, previousOwnerId, ct);
+
+        return Results.Ok(new DealResponse(
+            deal.Id, deal.Title, deal.Amount, deal.CloseDate, deal.OwnerId,
+            deal.PipelineId, deal.PipelineStageId, deal.CompanyId, deal.ContactId));
     }
 }

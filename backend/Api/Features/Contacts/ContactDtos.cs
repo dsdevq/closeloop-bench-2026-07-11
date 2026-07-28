@@ -14,3 +14,5 @@ public sealed record CreateContactRequest(
     string? Phone,
     Guid? CompanyId,
     Guid OwnerId);
+
+public sealed record PatchContactOwnerRequest(Guid OwnerId);

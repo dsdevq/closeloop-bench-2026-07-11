@@ -58,4 +58,11 @@ public sealed class Deal : Entity
 
         PipelineStageId = stage.Id;
     }
+
+    public void AssignOwner(Guid newOwnerId)
+    {
+        if (newOwnerId == Guid.Empty)
+            throw new ArgumentException("OwnerId must not be empty.", nameof(newOwnerId));
+        OwnerId = newOwnerId;
+    }
 }
