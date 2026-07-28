@@ -19,31 +19,40 @@ public sealed class DealTests
         return (pipeline, stage);
     }
 
+    private static Deal MakeDeal(Pipeline pipeline, PipelineStage stage, decimal amount = 500m)
+        => Deal.Create("Test Deal", amount, Guid.NewGuid(), pipeline.Id, stage.Id);
+
     [Fact]
     public void Create_WithValidArguments_ReturnsPopulatedDeal()
     {
+        var ownerId = Guid.NewGuid();
         var pipelineId = Guid.NewGuid();
         var stageId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         var contactId = Guid.NewGuid();
+        var closeDate = new DateOnly(2026, 12, 31);
 
-        var deal = Deal.Create(1500m, pipelineId, stageId, companyId, contactId);
+        var deal = Deal.Create("Enterprise License", 1500m, ownerId, pipelineId, stageId, closeDate, companyId, contactId);
 
         Assert.NotEqual(Guid.Empty, deal.Id);
+        Assert.Equal("Enterprise License", deal.Title);
         Assert.Equal(1500m, deal.Amount);
+        Assert.Equal(ownerId, deal.OwnerId);
         Assert.Equal(pipelineId, deal.PipelineId);
         Assert.Equal(stageId, deal.PipelineStageId);
+        Assert.Equal(closeDate, deal.CloseDate);
         Assert.Equal(companyId, deal.CompanyId);
         Assert.Equal(contactId, deal.ContactId);
     }
 
     [Fact]
-    public void Create_AllowsNullCompanyIdAndContactId()
+    public void Create_AllowsNullCompanyIdAndContactIdAndCloseDate()
     {
-        var deal = Deal.Create(0m, Guid.NewGuid(), Guid.NewGuid());
+        var deal = Deal.Create("Simple Deal", 0m, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
 
         Assert.Null(deal.CompanyId);
         Assert.Null(deal.ContactId);
+        Assert.Null(deal.CloseDate);
     }
 
     [Fact]
@@ -51,18 +60,39 @@ public sealed class DealTests
     {
         var pId = Guid.NewGuid();
         var sId = Guid.NewGuid();
+        var oId = Guid.NewGuid();
 
-        var a = Deal.Create(100m, pId, sId);
-        var b = Deal.Create(200m, pId, sId);
+        var a = Deal.Create("Deal A", 100m, oId, pId, sId);
+        var b = Deal.Create("Deal B", 200m, oId, pId, sId);
 
         Assert.NotEqual(a.Id, b.Id);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Create_WithBlankTitle_ThrowsArgumentException(string? title)
+    {
+        var ex = Assert.Throws<ArgumentException>(() =>
+            Deal.Create(title!, 100m, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()));
+
+        Assert.Equal("title", ex.ParamName);
+    }
+
+    [Fact]
+    public void Create_TrimsTitleWhitespace()
+    {
+        var deal = Deal.Create("  My Deal  ", 0m, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.Equal("My Deal", deal.Title);
     }
 
     [Fact]
     public void Create_WithNegativeAmount_ThrowsArgumentException()
     {
         var ex = Assert.Throws<ArgumentException>(() =>
-            Deal.Create(-1m, Guid.NewGuid(), Guid.NewGuid()));
+            Deal.Create("Deal", -1m, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()));
 
         Assert.Equal("amount", ex.ParamName);
     }
@@ -70,16 +100,25 @@ public sealed class DealTests
     [Fact]
     public void Create_WithZeroAmount_Succeeds()
     {
-        var deal = Deal.Create(0m, Guid.NewGuid(), Guid.NewGuid());
+        var deal = Deal.Create("Free Deal", 0m, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
 
         Assert.Equal(0m, deal.Amount);
+    }
+
+    [Fact]
+    public void Create_WithEmptyOwnerId_ThrowsArgumentException()
+    {
+        var ex = Assert.Throws<ArgumentException>(() =>
+            Deal.Create("Deal", 100m, Guid.Empty, Guid.NewGuid(), Guid.NewGuid()));
+
+        Assert.Equal("ownerId", ex.ParamName);
     }
 
     [Fact]
     public void Create_WithEmptyPipelineId_ThrowsArgumentException()
     {
         var ex = Assert.Throws<ArgumentException>(() =>
-            Deal.Create(100m, Guid.Empty, Guid.NewGuid()));
+            Deal.Create("Deal", 100m, Guid.NewGuid(), Guid.Empty, Guid.NewGuid()));
 
         Assert.Equal("pipelineId", ex.ParamName);
     }
@@ -88,7 +127,7 @@ public sealed class DealTests
     public void Create_WithEmptyPipelineStageId_ThrowsArgumentException()
     {
         var ex = Assert.Throws<ArgumentException>(() =>
-            Deal.Create(100m, Guid.NewGuid(), Guid.Empty));
+            Deal.Create("Deal", 100m, Guid.NewGuid(), Guid.NewGuid(), Guid.Empty));
 
         Assert.Equal("pipelineStageId", ex.ParamName);
     }
@@ -100,7 +139,7 @@ public sealed class DealTests
         pipeline.AddStage("Qualified", order: 1);
         var secondStage = pipeline.Stages[1];
 
-        var deal = Deal.Create(500m, pipeline.Id, firstStage.Id);
+        var deal = MakeDeal(pipeline, firstStage);
 
         deal.AdvanceTo(secondStage);
 
@@ -114,7 +153,7 @@ public sealed class DealTests
         pipeline.AddStage("Qualified", order: 1);
         var secondStage = pipeline.Stages[1];
 
-        var deal = Deal.Create(500m, pipeline.Id, firstStage.Id);
+        var deal = MakeDeal(pipeline, firstStage);
 
         deal.AdvanceTo(secondStage);
 
@@ -130,7 +169,7 @@ public sealed class DealTests
         pipeline.AddStage("Closing", order: 2);
 
         var stages = pipeline.Stages;
-        var deal = Deal.Create(1000m, pipeline.Id, stages[0].Id);
+        var deal = Deal.Create("Big Deal", 1000m, Guid.NewGuid(), pipeline.Id, stages[0].Id);
 
         deal.AdvanceTo(stages[1]);
         Assert.Equal(stages[1].Id, deal.PipelineStageId);
@@ -148,7 +187,7 @@ public sealed class DealTests
         otherPipeline.AddStage("Review", order: 0);
         var otherStage = otherPipeline.Stages[0];
 
-        var deal = Deal.Create(500m, pipeline.Id, stage.Id);
+        var deal = MakeDeal(pipeline, stage);
 
         var ex = Assert.Throws<ArgumentException>(() => deal.AdvanceTo(otherStage));
 

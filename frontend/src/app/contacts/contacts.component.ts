@@ -87,6 +87,7 @@ export class ContactsComponent implements OnInit {
       email,
       phone: phone || null,
       companyId: null,
+      ownerId: '00000000-0000-0000-0000-000000000001',
     }).subscribe({
       next: () => {
         this.form.reset();

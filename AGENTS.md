@@ -39,14 +39,16 @@ backend/
     CrmDbContext.cs                         EF Core DbContext (6 DbSets)
     CrmDbContextFactory.cs                  IDesignTimeDbContextFactory — env-sourced conn string for migrations
     Configurations/ IEntityTypeConfiguration<T> per aggregate (applied via ApplyConfigurationsFromAssembly)
-    Migrations/     EF Core migrations (InitialCreate) — generated, not executed at build time
+    Migrations/     EF Core migrations (InitialCreate, AddNotifications, AddOwnerAndDealFields) — generated, not executed at build time
   Infrastructure.Tests/ Infrastructure.Tests.csproj  xUnit — refs Infrastructure + EF Core InMemory
     CrmDbContextModelTests.cs              exercises OnModelCreating; asserts FK/cascade semantics
   Api/              Api.csproj              web app   — refs Infrastructure
         Program.cs  minimal API host + CrmDbContext DI registration (Npgsql)
     Features/
-      Contacts/     ContactsEndpoints.cs, ContactDtos.cs  (GET list/detail, POST create)
+      Contacts/     ContactsEndpoints.cs, ContactDtos.cs  (GET list/detail, POST create) — includes OwnerId
       Companies/    CompaniesEndpoints.cs, CompanyDtos.cs (GET list/detail, POST create)
+      Deals/        DealsEndpoints.cs, DealDtos.cs        (GET list/detail, POST create)
+      Pipelines/    PipelinesEndpoints.cs, PipelineDtos.cs (GET list/detail, POST create with stages)
 ```
 
 ## Clean-architecture layering
@@ -91,31 +93,30 @@ in PR #3. They are kept only because devclaw's test-integrity gate cannot curren
 prior-PR-audited equivalent on a deletion diff. **Do not delete these files until that harness
 gap is fixed.**
 
+`backend/Tests/Api/ContactsEndpointsTests.cs` was deleted (its 4 tests were ported into
+`backend/Api.Tests/Features/Contacts/ContactsEndpointsTests.cs` with their original method names
+before deletion, to satisfy the test-integrity gate).
+
 ### Known gaps / Docker
 
 **Static-file serving not wired** — `backend/Api/Program.cs` does not yet call `UseDefaultFiles()` + `UseStaticFiles()`. The Angular bundle is copied into `wwwroot/` in the image but the API does not serve it at runtime. When that hookup is added to Program.cs the frontend will be served from the same origin as the API (no separate server needed). Until then, `docker run` on this image exposes only the `/health` and `/contacts` API endpoints.
 
-### Known gaps / Notification dispatcher
+### Notification dispatcher — all four methods wired
 
-Three of the four `INotificationDispatcher` methods are **no-op stubs** in
-`Infrastructure/Services/NotificationDispatcher.cs`:
+All four `INotificationDispatcher` methods in `Infrastructure/Services/NotificationDispatcher.cs`
+create real `Notification` rows and call `SaveChangesAsync`:
 
-| Method | Blocked on |
-|---|---|
-| `DealAssignedAsync` | `Deal.OwnerId` field not yet in domain model |
-| `DealStageChangedAsync` | `Deal.OwnerId` field not yet in domain model |
-| `ContactAssignedAsync` | `Contact.OwnerId` field not yet in domain model |
+| Method | Recipient | Trigger | Caller |
+|---|---|---|---|
+| `DealAssignedAsync` | `deal.OwnerId` (new owner) | `DealAssigned` | `PATCH /deals/{id}/stage` (only when owner changes) |
+| `DealStageChangedAsync` | `deal.OwnerId` | `DealStageChanged` — title includes stage name | `PATCH /deals/{id}/stage` (always) |
+| `ContactAssignedAsync` | `contact.OwnerId` (new owner) | `ContactAssigned` | `PATCH /contacts/{id}/owner` (only when owner actually changes) |
+| `ActivityMentionAsync` | each mentioned user ID | `ActivityMention` | `POST /activities` |
 
-Until `Deal.OwnerId` and `Contact.OwnerId` are added (plus the PATCH endpoints that change
-ownership), these methods return `Task.CompletedTask` without creating any notification records.
-`ActivityMentionAsync` is the only dispatcher method fully wired to a real endpoint
-(`POST /activities`).
-
-`Pipeline.RottingThresholdDays` (`int?`) **is implemented** in the domain entity and EF configuration
-but has no consumer: the `DealRottingNotificationJob` background hosted service was deleted as
-permanently dead code (it referenced `Deal.OwnerId` which does not exist). Until the ownership
-slice lands and the background job is re-introduced, `RottingThresholdDays` is an orphaned field
-that can be set via `Pipeline.SetRottingThresholdDays()` but never read by any job or endpoint.
+All four dispatcher methods are now wired to real, reachable callers. The key guard: ownership-change
+dispatchers (`DealAssignedAsync`, `ContactAssignedAsync`) are only fired when the new owner differs
+from the previous owner — re-PATCHing with the same owner is a no-op that returns 200 without
+creating a spurious notification.
 
 ## Research citation convention
 
@@ -145,8 +146,8 @@ them in. Do not omit or rename a section.
 
 The `notifications.md` artifact defines: `Notification` entity (`Id`, `RecipientUserId`, `Trigger`,
 `Title`, `Body`, `RelatedEntityId`, `RelatedEntityType`, `IsRead`, `CreatedAt`); `NotificationTrigger`
-enum (six values: `DealAssigned`, `DealStageChanged`, `DealRotting`, `ContactAssigned`,
-`ActivityMention`, `TaskDue`); `NotificationEntityType` enum (`Contact`, `Company`, `Deal`,
+enum (four values: `DealAssigned`=0, `DealStageChanged`=1, `ContactAssigned`=3, `ActivityMention`=4;
+`DealRotting`=2 and `TaskDue`=5 were removed as unconsumed — explicit int values kept to preserve DB mapping); `NotificationEntityType` enum (`Contact`, `Company`, `Deal`,
 `Activity`); `INotificationDispatcher` interface (four methods — one per event-driven trigger);
 and three API endpoints (`GET /notifications`, `PATCH /notifications/{id}/read`,
 `POST /notifications/read-all`). Design borrows from HubSpot's named-trigger taxonomy, Attio's
@@ -154,11 +155,11 @@ and three API endpoints (`GET /notifications`, `PATCH /notifications/{id}/read`,
 rule engine, HubSpot's webhook-first push model, Attio's record-following subscription, and
 Pipedrive's email fallback are all explicitly rejected (see artifact for argued reasoning).
 
-**Current wiring state**: `ActivityMentionAsync` is called from `POST /activities` after
-`SaveChanges` — the only dispatcher method currently integrated into a real endpoint. The other
-three methods (`DealAssignedAsync`, `DealStageChangedAsync`, `ContactAssignedAsync`) are no-op
-stubs in `NotificationDispatcher` pending `Deal.OwnerId` and `Contact.OwnerId` fields, which are
-not yet in the domain model (see Known Gaps below).
+**Current wiring state**: All four dispatcher methods are integrated. `PATCH /deals/{id}/stage`
+fires `DealStageChangedAsync` (always) and `DealAssignedAsync` (only when `req.OwnerId` differs
+from the current owner). `PATCH /contacts/{id}/owner` fires `ContactAssignedAsync` (only when
+`req.OwnerId != contact.OwnerId` — same-owner PATCH is a no-op). `POST /activities` fires
+`ActivityMentionAsync` after `SaveChanges`.
 
 ## Domain entity conventions
 
@@ -244,6 +245,6 @@ Also: `Results.ValidationProblem` must receive `statusCode: StatusCodes.Status42
 - `Pipeline._stages` is a `private readonly List<PipelineStage>` backing field. EF Core is told to use it via `Navigation(p => p.Stages).HasField("_stages").UsePropertyAccessMode(PropertyAccessMode.Field)` because the `Stages` getter returns a computed `IReadOnlyList` (OrderBy + ToList), not the field itself.
 - Activity anchor FKs (ContactId/CompanyId/DealId) use `DeleteBehavior.Restrict` — not SetNull — because nulling the sole anchor would silently violate the exactly-one-anchor domain invariant that Activity.Create enforces.
 - PipelineStage→Pipeline uses `DeleteBehavior.Cascade` (deleting a pipeline removes its stages). Deal→Pipeline and Deal→PipelineStage use `DeleteBehavior.Restrict` (cannot delete a pipeline or stage that has live deals).
-- `NotificationTrigger` is a closed enum (six values). A seventh trigger is an additive enum extension, not a rule-record migration — this was the explicit reason for rejecting Salesforce's configurable rule-engine model (see `.devclaw/research/notifications.md` §Rejected A).
-- `INotificationDispatcher` lives at the Domain boundary; the concrete implementation sits in Infrastructure. `POST /activities` calls `ActivityMentionAsync` post-SaveChanges; the dispatcher does a second SaveChanges (eventual consistency, acceptable for informational notifications). The other three methods (`DealAssignedAsync`, `DealStageChangedAsync`, `ContactAssignedAsync`) are currently no-op stubs — see Known Gaps / Notification dispatcher.
+- `NotificationTrigger` is a closed enum (four values: DealAssigned, DealStageChanged, ContactAssigned, ActivityMention). Values carry explicit integers (0, 1, 3, 4) to preserve DB row mapping after `DealRotting`=2 and `TaskDue`=5 were deleted. A new trigger is an additive enum extension with an explicit next integer — this was the explicit reason for rejecting Salesforce's configurable rule-engine model (see `.devclaw/research/notifications.md` §Rejected A).
+- `INotificationDispatcher` lives at the Domain boundary; the concrete implementation sits in Infrastructure. `POST /activities` calls `ActivityMentionAsync` post-SaveChanges; the dispatcher does a second SaveChanges (eventual consistency, acceptable for informational notifications). All four dispatcher methods create real `Notification` rows and are wired to real, reachable callers (see the dispatcher table above: `PATCH /deals/{id}/stage`, `PATCH /contacts/{id}/owner`, `POST /activities`).
 - `@mention` syntax in `Activity.Note` is parsed in the application (endpoint) layer, not in the `Activity` domain entity — the entity stays `string?`-typed; mention resolution is an application concern injected via `INotificationDispatcher.ActivityMentionAsync`. Pattern: `@<uuid>` (UUID rather than display name). Email/SMS fallback delivery was explicitly deferred (see `.devclaw/research/notifications.md` §Rejected D).

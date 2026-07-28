@@ -52,7 +52,7 @@ public sealed class NotificationTests
     {
         var before = DateTime.UtcNow.AddSeconds(-1);
 
-        var notification = Notification.Create(Guid.NewGuid(), NotificationTrigger.TaskDue, "Task is due");
+        var notification = Notification.Create(Guid.NewGuid(), NotificationTrigger.DealAssigned, "Deal was assigned");
 
         Assert.True(notification.CreatedAt >= before);
         Assert.True(notification.CreatedAt <= DateTime.UtcNow.AddSeconds(1));
