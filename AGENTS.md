@@ -77,6 +77,8 @@ bash scripts/verify.sh
 
 `scripts/verify.sh` checks that Domain has no outward project references (clean-arch enforcement), then runs `dotnet build closeloop.sln --configuration Release`, then runs `dotnet test --no-build` against the full solution, then runs `ng test --watch=false` in `frontend/`. Test layers covered: **Domain unit tests** (`backend/Domain.Tests`), **Infrastructure model tests** (`backend/Infrastructure.Tests`), **API integration tests** (`backend/Api.Tests`), and **Angular unit tests** (`frontend/src/app/**/*.spec.ts`, Vitest via `@angular/build:unit-test`).
 
+The CI workflow (`.github/workflows/ci.yml`) adds a second `docker-integration` job that builds the production Docker image and runs a smoke test against a real Postgres service using `DATABASE_URL` — this validates the full end-to-end container path and the `DATABASE_URL` precedence branch that unit tests cannot exercise.
+
 ## Docker
 
 A multi-stage root `Dockerfile` builds the full stack:
@@ -97,9 +99,20 @@ gap is fixed.**
 `backend/Api.Tests/Features/Contacts/ContactsEndpointsTests.cs` with their original method names
 before deletion, to satisfy the test-integrity gate).
 
-### Known gaps / Docker
+### Docker — deploy gesture
 
-**Static-file serving not wired** — `backend/Api/Program.cs` does not yet call `UseDefaultFiles()` + `UseStaticFiles()`. The Angular bundle is copied into `wwwroot/` in the image but the API does not serve it at runtime. When that hookup is added to Program.cs the frontend will be served from the same origin as the API (no separate server needed). Until then, `docker run` on this image exposes only the `/health` and `/contacts` API endpoints.
+The canonical one-liner to run the full stack:
+
+```bash
+docker build -t closeloop .
+docker run -p 8080:8080 \
+  -e DATABASE_URL="Host=<host>;Port=5432;Database=<db>;Username=<user>;Password=<pass>" \
+  closeloop
+```
+
+`Program.cs` checks `DATABASE_URL` first, then falls back to `ConnectionStrings__DefaultConnection` (the ASP.NET Core double-underscore env-var form). The app auto-applies EF Core migrations on startup via `db.Database.Migrate()` (guarded by `db.Database.IsRelational()` so InMemory tests are unaffected). Static files (Angular bundle) are served from `wwwroot/` via `UseDefaultFiles()` + `UseStaticFiles()`.
+
+See `.devclaw/research/deploy-shape.md` for the borrowed-vs-rejected rationale.
 
 ### Notification dispatcher — all four methods wired
 
