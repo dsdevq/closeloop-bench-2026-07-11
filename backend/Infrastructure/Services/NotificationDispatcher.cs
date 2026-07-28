@@ -9,17 +9,41 @@ public sealed class NotificationDispatcher : INotificationDispatcher
 
     public NotificationDispatcher(CrmDbContext db) => _db = db;
 
-    // Requires Deal.OwnerId — deferred until the ownership slice adds that field.
-    public Task DealAssignedAsync(Deal deal, Guid previousOwnerId, CancellationToken ct = default)
-        => Task.CompletedTask;
+    public async Task DealAssignedAsync(Deal deal, Guid previousOwnerId, CancellationToken ct = default)
+    {
+        _db.Notifications.Add(Notification.Create(
+            recipientUserId: deal.OwnerId,
+            trigger: NotificationTrigger.DealAssigned,
+            title: "Deal assigned to you",
+            body: deal.Title,
+            relatedEntityId: deal.Id,
+            relatedEntityType: NotificationEntityType.Deal));
+        await _db.SaveChangesAsync(ct);
+    }
 
-    // Requires Deal.OwnerId — deferred until the ownership slice adds that field.
-    public Task DealStageChangedAsync(Deal deal, PipelineStage toStage, CancellationToken ct = default)
-        => Task.CompletedTask;
+    public async Task DealStageChangedAsync(Deal deal, PipelineStage toStage, CancellationToken ct = default)
+    {
+        _db.Notifications.Add(Notification.Create(
+            recipientUserId: deal.OwnerId,
+            trigger: NotificationTrigger.DealStageChanged,
+            title: $"Deal moved to {toStage.Name}",
+            body: deal.Title,
+            relatedEntityId: deal.Id,
+            relatedEntityType: NotificationEntityType.Deal));
+        await _db.SaveChangesAsync(ct);
+    }
 
-    // Requires Contact.OwnerId — deferred until the ownership slice adds that field.
-    public Task ContactAssignedAsync(Contact contact, Guid previousOwnerId, CancellationToken ct = default)
-        => Task.CompletedTask;
+    public async Task ContactAssignedAsync(Contact contact, Guid previousOwnerId, CancellationToken ct = default)
+    {
+        _db.Notifications.Add(Notification.Create(
+            recipientUserId: contact.OwnerId,
+            trigger: NotificationTrigger.ContactAssigned,
+            title: "Contact assigned to you",
+            body: contact.Name,
+            relatedEntityId: contact.Id,
+            relatedEntityType: NotificationEntityType.Contact));
+        await _db.SaveChangesAsync(ct);
+    }
 
     public async Task ActivityMentionAsync(
         Activity activity,

@@ -97,22 +97,21 @@ gap is fixed.**
 
 **Static-file serving not wired** — `backend/Api/Program.cs` does not yet call `UseDefaultFiles()` + `UseStaticFiles()`. The Angular bundle is copied into `wwwroot/` in the image but the API does not serve it at runtime. When that hookup is added to Program.cs the frontend will be served from the same origin as the API (no separate server needed). Until then, `docker run` on this image exposes only the `/health` and `/contacts` API endpoints.
 
-### Known gaps / Notification dispatcher
+### Notification dispatcher — all four methods wired
 
-Three of the four `INotificationDispatcher` methods are **no-op stubs** in
-`Infrastructure/Services/NotificationDispatcher.cs`:
+All four `INotificationDispatcher` methods in `Infrastructure/Services/NotificationDispatcher.cs`
+create real `Notification` rows and call `SaveChangesAsync`:
 
-| Method | Blocked on |
-|---|---|
-| `DealAssignedAsync` | PATCH endpoint for ownership change (field exists; dispatcher not wired) |
-| `DealStageChangedAsync` | PATCH endpoint for stage change (field exists; dispatcher not wired) |
-| `ContactAssignedAsync` | PATCH endpoint for ownership change (field exists; dispatcher not wired) |
+| Method | Recipient | Trigger |
+|---|---|---|
+| `DealAssignedAsync` | `deal.OwnerId` (new owner) | `DealAssigned` |
+| `DealStageChangedAsync` | `deal.OwnerId` | `DealStageChanged` — title includes stage name |
+| `ContactAssignedAsync` | `contact.OwnerId` (new owner) | `ContactAssigned` |
+| `ActivityMentionAsync` | each mentioned user ID | `ActivityMention` |
 
-`Deal.OwnerId`, `Deal.Title`, `Deal.CloseDate`, and `Contact.OwnerId` are now present in the
-domain entities and backed by the `AddOwnerAndDealFields` migration. Until PATCH endpoints for
-ownership/stage changes are added and the dispatcher methods are wired to those endpoints, these
-three methods return `Task.CompletedTask`. `ActivityMentionAsync` is the only dispatcher method
-fully wired to a real endpoint (`POST /activities`).
+`ActivityMentionAsync` is called from `POST /activities`. The other three dispatcher methods are
+ready to be wired but currently have no PATCH endpoints that trigger them — that remains a
+known gap until ownership-change and stage-advance PATCH endpoints are added.
 
 `Pipeline.RottingThresholdDays` (`int?`) **is implemented** in the domain entity and EF configuration
 but has no consumer: the `DealRottingNotificationJob` background hosted service was deleted as
@@ -249,5 +248,5 @@ Also: `Results.ValidationProblem` must receive `statusCode: StatusCodes.Status42
 - Activity anchor FKs (ContactId/CompanyId/DealId) use `DeleteBehavior.Restrict` — not SetNull — because nulling the sole anchor would silently violate the exactly-one-anchor domain invariant that Activity.Create enforces.
 - PipelineStage→Pipeline uses `DeleteBehavior.Cascade` (deleting a pipeline removes its stages). Deal→Pipeline and Deal→PipelineStage use `DeleteBehavior.Restrict` (cannot delete a pipeline or stage that has live deals).
 - `NotificationTrigger` is a closed enum (six values). A seventh trigger is an additive enum extension, not a rule-record migration — this was the explicit reason for rejecting Salesforce's configurable rule-engine model (see `.devclaw/research/notifications.md` §Rejected A).
-- `INotificationDispatcher` lives at the Domain boundary; the concrete implementation sits in Infrastructure. `POST /activities` calls `ActivityMentionAsync` post-SaveChanges; the dispatcher does a second SaveChanges (eventual consistency, acceptable for informational notifications). The other three methods (`DealAssignedAsync`, `DealStageChangedAsync`, `ContactAssignedAsync`) are currently no-op stubs — see Known Gaps / Notification dispatcher.
+- `INotificationDispatcher` lives at the Domain boundary; the concrete implementation sits in Infrastructure. `POST /activities` calls `ActivityMentionAsync` post-SaveChanges; the dispatcher does a second SaveChanges (eventual consistency, acceptable for informational notifications). All four dispatcher methods create real `Notification` rows; `DealAssignedAsync`, `DealStageChangedAsync`, and `ContactAssignedAsync` are implemented but not yet wired to any endpoint (no PATCH for ownership/stage change exists yet).
 - `@mention` syntax in `Activity.Note` is parsed in the application (endpoint) layer, not in the `Activity` domain entity — the entity stays `string?`-typed; mention resolution is an application concern injected via `INotificationDispatcher.ActivityMentionAsync`. Pattern: `@<uuid>` (UUID rather than display name). Email/SMS fallback delivery was explicitly deferred (see `.devclaw/research/notifications.md` §Rejected D).
