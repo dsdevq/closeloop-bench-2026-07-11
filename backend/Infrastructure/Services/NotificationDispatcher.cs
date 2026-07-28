@@ -50,7 +50,7 @@ public sealed class NotificationDispatcher : INotificationDispatcher
         IReadOnlyList<Guid> mentionedUserIds,
         CancellationToken ct = default)
     {
-        foreach (var userId in mentionedUserIds)
+        foreach (var userId in mentionedUserIds.Distinct())
         {
             _db.Notifications.Add(Notification.Create(
                 recipientUserId: userId,

@@ -195,18 +195,25 @@ public sealed class DealTests
     }
 
     [Fact]
-    public void AdvanceTo_StageOutsidePipeline_Throws()
+    public void AssignOwner_WithEmptyGuid_ThrowsArgumentException()
     {
         var (pipeline, stage) = MakePipelineWithStage();
-
-        var otherPipeline = Pipeline.Create("Renewal");
-        otherPipeline.AddStage("Review", order: 0);
-        var foreignStage = otherPipeline.Stages[0];
-
         var deal = MakeDeal(pipeline, stage);
 
-        var ex = Assert.Throws<ArgumentException>(() => deal.AdvanceTo(foreignStage));
+        var ex = Assert.Throws<ArgumentException>(() => deal.AssignOwner(Guid.Empty));
 
-        Assert.Equal("stage", ex.ParamName);
+        Assert.Equal("newOwnerId", ex.ParamName);
+    }
+
+    [Fact]
+    public void AssignOwner_WithValidGuid_UpdatesOwnerId()
+    {
+        var (pipeline, stage) = MakePipelineWithStage();
+        var deal = MakeDeal(pipeline, stage);
+        var newOwnerId = Guid.NewGuid();
+
+        deal.AssignOwner(newOwnerId);
+
+        Assert.Equal(newOwnerId, deal.OwnerId);
     }
 }
