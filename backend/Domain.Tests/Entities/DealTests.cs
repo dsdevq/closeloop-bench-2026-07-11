@@ -193,4 +193,27 @@ public sealed class DealTests
 
         Assert.Equal("stage", ex.ParamName);
     }
+
+    [Fact]
+    public void AssignOwner_WithEmptyGuid_ThrowsArgumentException()
+    {
+        var (pipeline, stage) = MakePipelineWithStage();
+        var deal = MakeDeal(pipeline, stage);
+
+        var ex = Assert.Throws<ArgumentException>(() => deal.AssignOwner(Guid.Empty));
+
+        Assert.Equal("newOwnerId", ex.ParamName);
+    }
+
+    [Fact]
+    public void AssignOwner_WithValidGuid_UpdatesOwnerId()
+    {
+        var (pipeline, stage) = MakePipelineWithStage();
+        var deal = MakeDeal(pipeline, stage);
+        var newOwnerId = Guid.NewGuid();
+
+        deal.AssignOwner(newOwnerId);
+
+        Assert.Equal(newOwnerId, deal.OwnerId);
+    }
 }

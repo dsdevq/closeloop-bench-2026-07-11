@@ -18,12 +18,12 @@ merged.
 
 ## Feature scope (synthesis target)
 
-| Surface | What is designed here |
+| Surface | What shipped |
 |---|---|
 | **Notification entity** | `Notification` domain entity: fields, factory invariants, read affordance |
-| **Trigger taxonomy** | `NotificationTrigger` enum: six named triggers derived from domain events |
+| **Trigger taxonomy** | `NotificationTrigger` enum: four named triggers — `DealAssigned`, `DealStageChanged`, `ContactAssigned`, `ActivityMention` |
 | **Dispatch interface** | `INotificationDispatcher` contract: how API handlers fan out after SaveChanges |
-| **Background job** | `DealRottingNotificationJob`: hosted service scanning for stale deals |
+| **Background job** | **deferred** — `DealRottingNotificationJob` was designed (see Borrowed §3) but not implemented |
 | **API endpoints** | `GET /notifications`, `PATCH /notifications/{id}/read`, `POST /notifications/read-all` |
 | **Mention surface** | @mention syntax in `Activity.Note` text parsed on write; mention notification fired |
 
@@ -86,14 +86,15 @@ public sealed class Notification : Entity
 
 ```csharp
 // backend/Domain/Entities/NotificationTrigger.cs
+// Explicit int values preserve DB row mapping; gaps at 2 and 5 are reserved (removed triggers).
 public enum NotificationTrigger
 {
-    DealAssigned,      // deal.OwnerId changed to this user (via PATCH /deals/{id})
-    DealStageChanged,  // deal advanced to a new stage (PATCH /deals/{id}/stage)
-    DealRotting,       // deal has no activity for > pipeline.RottingThresholdDays (background job)
-    ContactAssigned,   // contact.OwnerId changed to this user (via PATCH /contacts/{id})
-    ActivityMention,   // @mention pattern matched in Activity.Note on POST /activities
-    TaskDue,           // Task Activity with DueAt within 24 h (background job)
+    DealAssigned     = 0,  // deal.OwnerId changed to this user (via PATCH /deals/{id}/stage)
+    DealStageChanged = 1,  // deal advanced to a new stage (PATCH /deals/{id}/stage)
+                           // 2 = DealRotting — removed; background job deferred
+    ContactAssigned  = 3,  // contact.OwnerId changed to this user (via PATCH /contacts/{id}/owner)
+    ActivityMention  = 4,  // @mention pattern matched in Activity.Note on POST /activities
+                           // 5 = TaskDue — removed; background job deferred
 }
 
 // backend/Domain/Entities/NotificationEntityType.cs
@@ -221,27 +222,27 @@ Response shape for `GET /notifications`:
 
 ## Borrowed
 
-### 1. HubSpot's named-trigger taxonomy: six discrete trigger types (not a generic event bus)
+### 1. HubSpot's named-trigger taxonomy: closed discrete trigger types (not a generic event bus)
 
-- **What**: The `NotificationTrigger` enum encodes exactly six named triggers:
-  `DealAssigned`, `DealStageChanged`, `DealRotting`, `ContactAssigned`, `ActivityMention`,
-  `TaskDue`. Each trigger maps to a specific domain state transition that closeloop's API already
-  owns (deal stage advance, assignment change, activity creation). The enum is closed — it does
-  not accept arbitrary plugin-defined event types. The `INotificationDispatcher` interface exposes
-  one method per trigger (not a generic `Dispatch(object event)` signature), so callers are
-  type-checked at compile time.
+- **What**: The `NotificationTrigger` enum encodes four shipped named triggers:
+  `DealAssigned`, `DealStageChanged`, `ContactAssigned`, `ActivityMention` (two additional triggers,
+  `DealRotting` and `TaskDue`, were designed but removed as unconsumed pending background-job
+  implementation). Each trigger maps to a specific domain state transition that closeloop's API
+  already owns (deal stage advance, assignment change, activity creation). The enum is closed — it
+  does not accept arbitrary plugin-defined event types. The `INotificationDispatcher` interface
+  exposes one method per trigger (not a generic `Dispatch(object event)` signature), so callers
+  are type-checked at compile time.
 - **From**: HubSpot CRM — the HubSpot webhook subscription system defines discrete named event
   types (`deal.propertyChange`, `contact.propertyChange`, `deal.creation`, etc.) rather than a
   generic change feed; the HubSpot Notifications API similarly groups in-app notifications by
   named category. HubSpot's task-due reminder is a first-class trigger, not derived from a generic
   activity-changed event.
-- **Why it fits**: closeloop's MVP has exactly six notification-worthy events corresponding to
-  domain state changes the API layer already controls. A closed enum keeps the `INotificationDispatcher`
-  interface stable and its callers obvious — every endpoint that mutates a relevant field either
-  calls a dispatcher method or does not. The six triggers cover the two primary ownership-change
-  events, the deal-health signal (rotting), the collaboration surface (mention), the pipeline
-  progression event (stage change), and the task management surface (task due) without requiring
-  a generalised event-sourcing infrastructure.
+- **Why it fits**: A closed enum keeps the `INotificationDispatcher` interface stable and its
+  callers obvious — every endpoint that mutates a relevant field either calls a dispatcher method
+  or does not. The four shipped triggers cover the two primary ownership-change events, the
+  collaboration surface (mention), and the pipeline progression event (stage change). Expanding
+  to a fifth or sixth trigger (rotting, task due) is a type-safe additive enum extension, not a
+  schema migration.
 
 ### 2. Attio's @mention surface: `@username` syntax in `Activity.Note` parsed on write
 

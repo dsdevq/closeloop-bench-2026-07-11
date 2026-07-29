@@ -19,3 +19,48 @@ jobs:
           node-version: '22'
 
       - run: bash scripts/verify.sh
+
+  docker-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: closeloop
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: closeloop_ci
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t closeloop:ci .
+
+      - name: Start app container with DATABASE_URL
+        run: |
+          docker run -d \
+            --name closeloop-app \
+            --network host \
+            -e DATABASE_URL="Host=127.0.0.1;Port=5432;Database=closeloop_ci;Username=closeloop;Password=testpass" \
+            closeloop:ci
+
+      - name: Wait for app to become healthy
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8080/health && echo "App is ready" && break
+            echo "Waiting for app (attempt $i/30)..."
+            sleep 3
+          done
+          curl -sf http://localhost:8080/health || { docker logs closeloop-app; exit 1; }
+
+      - name: Smoke test API health endpoint
+        run: curl -sf http://localhost:8080/health | grep -q '"healthy"'
+
+      - name: Smoke test frontend (index.html served from wwwroot)
+        run: curl -sf http://localhost:8080/ | grep -qi 'DOCTYPE html'

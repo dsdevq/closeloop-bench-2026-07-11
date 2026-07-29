@@ -18,17 +18,16 @@ Primary research artifacts (read these for source-level detail):
 
 | Entity | Domain layer | EF Core config | API endpoints |
 |---|---|---|---|
-| **Contact** | `backend/Domain/Entities/Contact.cs` | `ContactConfiguration.cs` | **SHIPPED** (`/contacts` GET + POST) |
-| **Company** | `backend/Domain/Entities/Company.cs` | `CompanyConfiguration.cs` | **API pending** |
-| **Deal** | `backend/Domain/Entities/Deal.cs` | `DealConfiguration.cs` | **API pending** |
-| **Activity** | `backend/Domain/Entities/Activity.cs` | `ActivityConfiguration.cs` | **API pending** |
-| **Pipeline** | `backend/Domain/Entities/Pipeline.cs` | `PipelineConfiguration.cs` | **API pending** |
-| **PipelineStage** | `backend/Domain/Entities/PipelineStage.cs` | `PipelineStageConfiguration.cs` | **API pending** |
+| **Contact** | `backend/Domain/Entities/Contact.cs` | `ContactConfiguration.cs` | **SHIPPED** (`/contacts` GET + POST, PATCH owner) |
+| **Company** | `backend/Domain/Entities/Company.cs` | `CompanyConfiguration.cs` | **SHIPPED** (`/companies` GET + POST) |
+| **Deal** | `backend/Domain/Entities/Deal.cs` | `DealConfiguration.cs` | **SHIPPED** (`/deals` GET + POST, PATCH stage) |
+| **Activity** | `backend/Domain/Entities/Activity.cs` | `ActivityConfiguration.cs` | **SHIPPED** (`/activities` POST; GET deferred — see AGENTS.md) |
+| **Pipeline** | `backend/Domain/Entities/Pipeline.cs` | `PipelineConfiguration.cs` | **SHIPPED** (`/pipelines` GET + POST) |
+| **PipelineStage** | `backend/Domain/Entities/PipelineStage.cs` | `PipelineStageConfiguration.cs` | **SHIPPED** (managed via Pipeline endpoints) |
 
-All six domain entities and their EF Core configurations are shipped. The `InitialCreate` migration
-captures all six tables. Only the Contacts API feature (`backend/Api/Features/Contacts/`) has REST
-endpoints; the Companies API feature (`backend/Api/Features/Companies/`) is now also implemented.
-Deals, Activities, and Pipelines are **modeled, implementation pending** at the API layer.
+All six domain entities, EF Core configurations, and API endpoint groups are shipped. The
+`InitialCreate` migration captures all six tables. `GET /activities` is intentionally deferred
+pending filtering/pagination decisions; see AGENTS.md § Intentionally deferred endpoints.
 
 ---
 
@@ -124,26 +123,26 @@ Deals, Activities, and Pipelines are **modeled, implementation pending** at the 
 
 ---
 
-### Deal — modeled, API implementation pending
+### Deal — shipped (domain + API)
 
 **Shipped fields** (`backend/Domain/Entities/Deal.cs`):
 
 | Field | Type | Constraints |
 |---|---|---|
 | `Id` | `Guid` | PK |
-| `Amount` | `decimal` | required, non-negative, precision (18, 4) |
+| `Title` | `string` | required, trimmed |
+| `Amount` | `decimal` | required, non-negative |
+| `CloseDate` | `DateOnly?` | optional |
+| `OwnerId` | `Guid` | required, non-empty |
 | `PipelineId` | `Guid` | required FK → Pipeline, `Restrict` delete |
 | `PipelineStageId` | `Guid` | required FK → PipelineStage, `Restrict` delete |
 | `CompanyId` | `Guid?` | optional FK → Company, `SetNull` on company delete |
 | `ContactId` | `Guid?` | optional FK → Contact, `SetNull` on contact delete |
 
 **Domain methods**: `AdvanceTo(PipelineStage stage)` validates the target stage belongs to the
-same pipeline as the deal before updating `PipelineStageId`.
-
-> **Fields not yet in entity**: `Title: string` and `CloseDate: DateOnly?` are specified in
-> the research model (`.devclaw/research/deals.md` Borrowed §5) and required for the Kanban
-> card and overdue-detection features. They are API-layer requirements to be added when the
-> Deals API feature is implemented.
+same pipeline as the deal before updating `PipelineStageId`. `AssignOwner(Guid newOwnerId)`
+validates non-empty and updates `OwnerId`; called by `PATCH /deals/{id}/stage` when the
+request includes a new owner.
 
 **Borrowed from reference CRMs** (`.devclaw/research/deals.md`,
 `.devclaw/research/domain-model.md`):
@@ -179,7 +178,7 @@ same pipeline as the deal before updating `PipelineStageId`.
 
 ---
 
-### Activity — modeled, API implementation pending
+### Activity — shipped (domain + API write)
 
 **Shipped fields** (`backend/Domain/Entities/Activity.cs`):
 
@@ -241,7 +240,7 @@ use `DeleteBehavior.Restrict` to prevent nulling the sole anchor.
 
 ---
 
-### Pipeline + PipelineStage — modeled, API implementation pending
+### Pipeline + PipelineStage — shipped (domain + API)
 
 **Shipped fields** (`backend/Domain/Entities/Pipeline.cs`):
 
@@ -362,8 +361,9 @@ and are intentional:
    `DealId`). Rationale: mirrors Deal's FK pattern; enables typed EF Core navigation and
    per-anchor partial indexes without a `switch (TargetType)` dispatch.
 
-3. **Deal.Title / Deal.CloseDate**: Named in the research model; not yet on the entity. Required
-   for Kanban card rendering and overdue detection. Must be added with the Deals API feature.
+3. **Deal.Title / Deal.CloseDate / Deal.OwnerId**: All three are present on the shipped entity
+   (`Deal.cs`). The stale research-model note saying these were "not yet added" is no longer
+   accurate — they were included in the Deals API implementation (PR #8).
 
 4. **Activity.DueAt / Activity.IsDone**: Required for the Task sub-type; not yet on the entity.
    Must be added with the Activities API feature.

@@ -154,6 +154,50 @@ public sealed class ActivitiesEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task PostActivity_WithMention_ResponseIncludesMentionedUserIds()
+    {
+        var contactId = Guid.NewGuid();
+        var mentionedUserId = Guid.NewGuid();
+        var note = $"Hey @{mentionedUserId} please review this";
+
+        var req = new CreateActivityRequest(
+            ActivityType.Note,
+            note,
+            DateTime.UtcNow,
+            ContactId: contactId,
+            CompanyId: null,
+            DealId: null);
+
+        var response = await _client.PostAsJsonAsync("/activities", req);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ActivityResponse>();
+        Assert.NotNull(body);
+        Assert.Single(body.MentionedUserIds);
+        Assert.Equal(mentionedUserId, body.MentionedUserIds[0]);
+    }
+
+    [Fact]
+    public async Task PostActivity_NoMention_ResponseHasEmptyMentionedUserIds()
+    {
+        var contactId = Guid.NewGuid();
+        var req = new CreateActivityRequest(
+            ActivityType.Note,
+            "Plain note with no mentions",
+            DateTime.UtcNow,
+            ContactId: contactId,
+            CompanyId: null,
+            DealId: null);
+
+        var response = await _client.PostAsJsonAsync("/activities", req);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ActivityResponse>();
+        Assert.NotNull(body);
+        Assert.Empty(body.MentionedUserIds);
+    }
+
+    [Fact]
     public async Task PostActivity_NoAnchor_Returns422()
     {
         var req = new CreateActivityRequest(

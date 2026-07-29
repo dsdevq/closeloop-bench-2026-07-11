@@ -158,4 +158,56 @@ public sealed class NotificationDispatcherTests
         await using var read = CreateContext();
         Assert.Equal(1, await read.Notifications.CountAsync());
     }
+
+    // ── ActivityMentionAsync ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ActivityMentionAsync_CreatesOneNotificationPerMentionedUser()
+    {
+        var contact = Contact.Create("Alice", "alice@example.com", null, null, Guid.NewGuid());
+        var activity = Activity.Create(ActivityType.Note, "See @user1 and @user2", DateTime.UtcNow, contactId: contact.Id);
+        var userId1 = Guid.NewGuid();
+        var userId2 = Guid.NewGuid();
+
+        await using var ctx = CreateContext();
+        ctx.Contacts.Add(contact);
+        ctx.Activities.Add(activity);
+        await ctx.SaveChangesAsync();
+
+        var dispatcher = new NotificationDispatcher(ctx);
+        await dispatcher.ActivityMentionAsync(activity, [userId1, userId2]);
+
+        await using var read = CreateContext();
+        var notifications = await read.Notifications.ToListAsync();
+        Assert.Equal(2, notifications.Count);
+        Assert.Contains(notifications, n => n.RecipientUserId == userId1);
+        Assert.Contains(notifications, n => n.RecipientUserId == userId2);
+        Assert.All(notifications, n =>
+        {
+            Assert.Equal(NotificationTrigger.ActivityMention, n.Trigger);
+            Assert.Equal("You were mentioned in a note", n.Title);
+            Assert.Equal(activity.Id, n.RelatedEntityId);
+            Assert.Equal(NotificationEntityType.Activity, n.RelatedEntityType);
+            Assert.False(n.IsRead);
+        });
+    }
+
+    [Fact]
+    public async Task ActivityMentionAsync_DeduplicatesMentionedUserIds()
+    {
+        var contact = Contact.Create("Bob", "bob@example.com", null, null, Guid.NewGuid());
+        var activity = Activity.Create(ActivityType.Note, "Hello!", DateTime.UtcNow, contactId: contact.Id);
+        var userId = Guid.NewGuid();
+
+        await using var ctx = CreateContext();
+        ctx.Contacts.Add(contact);
+        ctx.Activities.Add(activity);
+        await ctx.SaveChangesAsync();
+
+        var dispatcher = new NotificationDispatcher(ctx);
+        await dispatcher.ActivityMentionAsync(activity, [userId, userId]);
+
+        await using var read = CreateContext();
+        Assert.Equal(1, await read.Notifications.CountAsync());
+    }
 }

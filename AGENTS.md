@@ -77,6 +77,8 @@ bash scripts/verify.sh
 
 `scripts/verify.sh` checks that Domain has no outward project references (clean-arch enforcement), then runs `dotnet build closeloop.sln --configuration Release`, then runs `dotnet test --no-build` against the full solution, then runs `ng test --watch=false` in `frontend/`. Test layers covered: **Domain unit tests** (`backend/Domain.Tests`), **Infrastructure model tests** (`backend/Infrastructure.Tests`), **API integration tests** (`backend/Api.Tests`), and **Angular unit tests** (`frontend/src/app/**/*.spec.ts`, Vitest via `@angular/build:unit-test`).
 
+The CI workflow (`.github/workflows/ci.yml`) adds a second `docker-integration` job that builds the production Docker image and runs a smoke test against a real Postgres service using `DATABASE_URL` — this validates the full end-to-end container path and the `DATABASE_URL` precedence branch that unit tests cannot exercise.
+
 ## Docker
 
 A multi-stage root `Dockerfile` builds the full stack:
@@ -85,21 +87,64 @@ A multi-stage root `Dockerfile` builds the full stack:
 2. **dotnet-build** — `mcr.microsoft.com/dotnet/sdk:9.0.315` (exact version from `global.json`); restores and publishes `backend/Api/Api.csproj` to `/publish`.
 3. **runtime** — `mcr.microsoft.com/dotnet/aspnet:9.0`; copies published API + Angular bundle into `wwwroot/`.
 
-### Known gaps / Temporary duplicate test files
+### MVP scope decisions — named deferrals
 
-`backend/Tests/Domain/DealTests.cs` and `backend/Tests/Domain/PipelineTests.cs` are intentionally
-retained dead weight. Their audited, fully-ported equivalents were merged into `backend/Domain.Tests/`
-in PR #3. They are kept only because devclaw's test-integrity gate cannot currently credit a
-prior-PR-audited equivalent on a deletion diff. **Do not delete these files until that harness
-gap is fixed.**
+**Angular UI for Deals, Pipelines, Activities, and Notifications is intentionally absent.**
+The backend API endpoints for all four features are shipped (REST handlers, DTOs, EF Core
+persistence, notification dispatch), but no Angular components, routes, or services exist for
+them yet. `frontend/src/app/` contains only `contacts/` and `companies/` components. This is a
+documented MVP deferral, not an oversight — the UI work for these features is a separate,
+larger follow-up. Do not add Angular UI for these features without a dedicated scope decision.
 
-`backend/Tests/Api/ContactsEndpointsTests.cs` was deleted (its 4 tests were ported into
+**Hardcoded `ownerId` in `companies.component.ts` and `contacts.component.ts`** — both POST
+forms send `ownerId: '00000000-0000-0000-0000-000000000001'` as a hardcoded placeholder because
+no authentication or owner-resolution mechanism exists yet. This is a temporary MVP stub; the
+correct fix is to supply a real owner ID from the authenticated session once auth is added.
+See the auth note below.
+
+**No authentication or identity layer exists.** The API is fully unauthenticated. User identity
+is not verified server-side — the `ownerId` in contact/company/deal create requests is accepted
+as-is from the client body. `GET /notifications` and notification ownership checks also use a
+`userId` query parameter supplied by the caller with no verification. **Before building any
+user-scoped feature** (notifications inbox, per-user dashboards, assignment rules), an auth
+layer must be added to replace the stub `ownerId` approach. Options: ASP.NET Core JWT bearer
+middleware, session cookie, or a thin identity proxy in front of the API.
+
+### Intentionally deferred endpoints
+
+`GET /activities` is **not implemented**. The write side (`POST /activities`) is live; the read
+feed is deferred pending decisions on filtering/pagination shape (per-record feed vs. global
+activity log). Do not add a GET handler without first updating this note and the research artifact
+(`.devclaw/research/activities.md`).
+
+### Deduplication of legacy Tests project
+
+`backend/Tests/Domain/DealTests.cs` and `backend/Tests/Domain/PipelineTests.cs` were the legacy
+duplicate test files. They have been deleted; their tests now live canonically in
+`backend/Domain.Tests/Entities/DealTests.cs` and `backend/Domain.Tests/Entities/PipelineTests.cs`.
+
+`backend/Tests/Api/ContactsEndpointsTests.cs` was deleted earlier (its 4 tests were ported into
 `backend/Api.Tests/Features/Contacts/ContactsEndpointsTests.cs` with their original method names
 before deletion, to satisfy the test-integrity gate).
 
-### Known gaps / Docker
+The `backend/Tests/` directory and its empty `Tests.csproj` have been fully removed from the
+repository and from `closeloop.sln`. No source files were ever migrated out — the project was
+always empty after the duplicate test files were deleted.
 
-**Static-file serving not wired** — `backend/Api/Program.cs` does not yet call `UseDefaultFiles()` + `UseStaticFiles()`. The Angular bundle is copied into `wwwroot/` in the image but the API does not serve it at runtime. When that hookup is added to Program.cs the frontend will be served from the same origin as the API (no separate server needed). Until then, `docker run` on this image exposes only the `/health` and `/contacts` API endpoints.
+### Docker — deploy gesture
+
+The canonical one-liner to run the full stack:
+
+```bash
+docker build -t closeloop .
+docker run -p 8080:8080 \
+  -e DATABASE_URL="Host=<host>;Port=5432;Database=<db>;Username=<user>;Password=<pass>" \
+  closeloop
+```
+
+`Program.cs` checks `DATABASE_URL` first, then falls back to `ConnectionStrings__DefaultConnection` (the ASP.NET Core double-underscore env-var form). The app auto-applies EF Core migrations on startup via `db.Database.Migrate()` (guarded by `db.Database.IsRelational()` so InMemory tests are unaffected). Static files (Angular bundle) are served from `wwwroot/` via `UseDefaultFiles()` + `UseStaticFiles()`.
+
+See `.devclaw/research/deploy-shape.md` for the borrowed-vs-rejected rationale.
 
 ### Notification dispatcher — all four methods wired
 
