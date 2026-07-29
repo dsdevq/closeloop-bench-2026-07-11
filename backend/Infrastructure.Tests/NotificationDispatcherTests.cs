@@ -30,7 +30,7 @@ public sealed class NotificationDispatcherTests
         await ctx.SaveChangesAsync();
 
         var dispatcher = new NotificationDispatcher(ctx);
-        await dispatcher.DealAssignedAsync(deal, previousOwnerId: Guid.NewGuid());
+        await dispatcher.DealAssignedAsync(deal);
 
         await using var read = CreateContext();
         var notification = await read.Notifications.SingleAsync();
@@ -57,7 +57,7 @@ public sealed class NotificationDispatcherTests
         await ctx.SaveChangesAsync();
 
         var dispatcher = new NotificationDispatcher(ctx);
-        await dispatcher.DealAssignedAsync(deal, previousOwnerId: Guid.NewGuid());
+        await dispatcher.DealAssignedAsync(deal);
 
         await using var read = CreateContext();
         Assert.Equal(1, await read.Notifications.CountAsync());
@@ -129,7 +129,7 @@ public sealed class NotificationDispatcherTests
         await ctx.SaveChangesAsync();
 
         var dispatcher = new NotificationDispatcher(ctx);
-        await dispatcher.ContactAssignedAsync(contact, previousOwnerId: Guid.NewGuid());
+        await dispatcher.ContactAssignedAsync(contact);
 
         await using var read = CreateContext();
         var notification = await read.Notifications.SingleAsync();
@@ -153,7 +153,7 @@ public sealed class NotificationDispatcherTests
         await ctx.SaveChangesAsync();
 
         var dispatcher = new NotificationDispatcher(ctx);
-        await dispatcher.ContactAssignedAsync(contact, previousOwnerId: Guid.NewGuid());
+        await dispatcher.ContactAssignedAsync(contact);
 
         await using var read = CreateContext();
         Assert.Equal(1, await read.Notifications.CountAsync());

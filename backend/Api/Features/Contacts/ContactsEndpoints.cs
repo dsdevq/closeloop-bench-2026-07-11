@@ -69,8 +69,7 @@ public static class ContactsEndpoints
         if (contact is null)
             return Results.NotFound();
 
-        var previousOwnerId = contact.OwnerId;
-        if (req.OwnerId == previousOwnerId)
+        if (req.OwnerId == contact.OwnerId)
             return Results.Ok(new ContactResponse(contact.Id, contact.Name, contact.Email, contact.Phone, contact.CompanyId, contact.OwnerId));
 
         try
@@ -85,7 +84,7 @@ public static class ContactsEndpoints
         }
 
         await db.SaveChangesAsync(ct);
-        await dispatcher.ContactAssignedAsync(contact, previousOwnerId, ct);
+        await dispatcher.ContactAssignedAsync(contact, ct);
 
         return Results.Ok(new ContactResponse(contact.Id, contact.Name, contact.Email, contact.Phone, contact.CompanyId, contact.OwnerId));
     }

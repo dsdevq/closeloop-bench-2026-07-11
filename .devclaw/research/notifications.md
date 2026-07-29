@@ -141,10 +141,12 @@ for notifications; they are informational, not transactional).
 ### API endpoints
 
 ```
-GET  /notifications                    list for authenticated user, ordered CreatedAt DESC
-                                       query params: ?isRead=false (default: all), ?limit=50&cursor=...
+GET  /notifications                    list notifications for a user, ordered CreatedAt DESC
+                                       query params: ?userId=<guid> (required), ?isRead=<bool> (optional, default: all),
+                                                     ?limit=<int> (optional, default: 50, max: 200)
 PATCH /notifications/{id}/read         mark one notification as read (idempotent)
 POST  /notifications/read-all          mark all unread notifications for the user as read
+                                       body: ?userId=<guid> (required)
 ```
 
 Response shape for `GET /notifications`:
@@ -163,10 +165,12 @@ Response shape for `GET /notifications`:
       "createdAt": "2026-07-17T09:00:00Z"
     }
   ],
-  "nextCursor": "...",
   "unreadCount": 3
 }
 ```
+
+> **Note:** Cursor-based pagination (`?cursor=…` / `nextCursor`) is not implemented. Page size is
+> capped at 200 via the `?limit` query parameter. Cursor pagination remains a deferred follow-up.
 
 ---
 

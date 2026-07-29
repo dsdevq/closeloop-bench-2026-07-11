@@ -44,6 +44,41 @@ public sealed class ActivitiesEndpointsTests : IDisposable
     public void Dispose() => _factory.Dispose();
 
     [Fact]
+    public async Task GetActivities_EmptyDatabase_ReturnsEmptyArray()
+    {
+        var response = await _client.GetAsync("/activities");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ActivityResponse[]>();
+        Assert.NotNull(body);
+        Assert.Empty(body);
+    }
+
+    [Fact]
+    public async Task GetActivities_AfterCreate_ReturnsCreatedActivity()
+    {
+        var contactId = Guid.NewGuid();
+        var req = new CreateActivityRequest(
+            ActivityType.Note,
+            "Activity for list test",
+            new DateTime(2026, 7, 1, 10, 0, 0, DateTimeKind.Utc),
+            ContactId: contactId,
+            CompanyId: null,
+            DealId: null);
+
+        await _client.PostAsJsonAsync("/activities", req);
+
+        var response = await _client.GetAsync("/activities");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ActivityResponse[]>();
+        Assert.NotNull(body);
+        Assert.Single(body);
+        Assert.Equal("Note", body[0].Type);
+        Assert.Equal("Activity for list test", body[0].Note);
+        Assert.Equal(contactId, body[0].ContactId);
+    }
+
+    [Fact]
     public async Task PostActivity_ValidRequest_Returns201WithCreatedActivity()
     {
         var contactId = Guid.NewGuid();

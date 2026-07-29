@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Domain.Entities;
 using Domain.Interfaces;
 using Infrastructure;
+using Microsoft.EntityFrameworkCore;
 
 namespace Api.Features.Activities;
 
@@ -15,8 +16,31 @@ public static class ActivitiesEndpoints
     public static IEndpointRouteBuilder MapActivitiesEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/activities");
+        group.MapGet("/", ListActivities);
         group.MapPost("/", CreateActivity);
         return app;
+    }
+
+    private static async Task<IResult> ListActivities(CrmDbContext db)
+    {
+        var activities = await db.Activities
+            .OrderByDescending(a => a.OccurredAt)
+            .Select(a => new { a.Id, a.Type, a.Note, a.OccurredAt, a.ContactId, a.CompanyId, a.DealId })
+            .ToListAsync();
+
+        var responses = activities
+            .Select(a => new ActivityResponse(
+                a.Id,
+                a.Type.ToString(),
+                a.Note,
+                a.OccurredAt,
+                a.ContactId,
+                a.CompanyId,
+                a.DealId,
+                ParseMentions(a.Note)))
+            .ToList();
+
+        return Results.Ok(responses);
     }
 
     private static async Task<IResult> CreateActivity(
