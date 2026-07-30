@@ -26,7 +26,7 @@ Key implementation decisions that this artifact builds on:
 
 | Surface | What is designed here |
 |---|---|
-| **Activity log (global)** | `GET /activities` with anchor-filter, type-filter, date-range, pagination |
+| **Activity log (global)** | `GET /activities` implemented as an unfiltered list (ordered `OccurredAt` DESC, no filter params). Anchor-filter, type-filter, date-range, and pagination are **deferred** — scoped deferral, not a design decision. |
 | **Per-record feed** | Embedded `recentActivities` slice (last 5) in contact/company/deal detail responses |
 | **Task surface** | Upcoming tasks (due date, done flag) surfaced as a filtered sub-view of activities |
 | **Log affordance** | `POST /activities` — shape, required fields, anchor validation |

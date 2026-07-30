@@ -89,7 +89,7 @@ public static class DealsEndpoints
                 new Dictionary<string, string[]> { ["stageId"] = ["Stage not found."] },
                 statusCode: StatusCodes.Status422UnprocessableEntity);
 
-        var previousOwnerId = deal.OwnerId;
+        var currentOwnerId = deal.OwnerId;
         try
         {
             deal.AdvanceTo(stage);
@@ -101,7 +101,7 @@ public static class DealsEndpoints
                 statusCode: StatusCodes.Status422UnprocessableEntity);
         }
 
-        var ownerChanged = req.OwnerId.HasValue && req.OwnerId.Value != previousOwnerId;
+        var ownerChanged = req.OwnerId.HasValue && req.OwnerId.Value != currentOwnerId;
         if (ownerChanged)
         {
             try { deal.AssignOwner(req.OwnerId!.Value); }
@@ -116,7 +116,7 @@ public static class DealsEndpoints
         await db.SaveChangesAsync(ct);
         await dispatcher.DealStageChangedAsync(deal, stage, ct);
         if (ownerChanged)
-            await dispatcher.DealAssignedAsync(deal, previousOwnerId, ct);
+            await dispatcher.DealAssignedAsync(deal, ct);
 
         return Results.Ok(new DealResponse(
             deal.Id, deal.Title, deal.Amount, deal.CloseDate, deal.OwnerId,

@@ -9,7 +9,7 @@ public sealed class NotificationDispatcher : INotificationDispatcher
 
     public NotificationDispatcher(CrmDbContext db) => _db = db;
 
-    public async Task DealAssignedAsync(Deal deal, Guid previousOwnerId, CancellationToken ct = default)
+    public async Task DealAssignedAsync(Deal deal, CancellationToken ct = default)
     {
         _db.Notifications.Add(Notification.Create(
             recipientUserId: deal.OwnerId,
@@ -33,7 +33,7 @@ public sealed class NotificationDispatcher : INotificationDispatcher
         await _db.SaveChangesAsync(ct);
     }
 
-    public async Task ContactAssignedAsync(Contact contact, Guid previousOwnerId, CancellationToken ct = default)
+    public async Task ContactAssignedAsync(Contact contact, CancellationToken ct = default)
     {
         _db.Notifications.Add(Notification.Create(
             recipientUserId: contact.OwnerId,
