@@ -292,6 +292,17 @@ Response shape for `GET /notifications`:
   is a `COUNT(*) WHERE DealId = ? AND Trigger = DealRotting AND CreatedAt > now()-24h > 0`
   guard query. No domain-layer change beyond the field addition is needed.
 
+> **Retraction (resolved):** The `RottingThresholdDays: int?` field described in this section
+> was added to `Pipeline` in migration `AddOwnerAndDealFields` and the `DealRotting` trigger
+> value (`=2`) was added to the `NotificationTrigger` enum. Both were subsequently removed:
+> `RottingThresholdDays` was dropped from the `pipelines` table by migration
+> `RemoveRottingFields`, and `DealRotting`=2 and `TaskDue`=5 were deleted from the enum as
+> unconsumed. The `RemoveRottingFields` migration also purges any `notifications` rows whose
+> `"Trigger" IN (2, 5)`. The `DealRottingNotificationJob` described in the code block above
+> was never implemented. Integer values 2 and 5 are now reserved gaps in `NotificationTrigger`
+> — they must not be reused. This retraction is fully closed; future deal-rotting support
+> requires a new trigger value (≥6) and a new migration.
+
 ---
 
 ## Rejected & why

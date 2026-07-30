@@ -112,9 +112,11 @@ middleware, session cookie, or a thin identity proxy in front of the API.
 
 ### Intentionally deferred endpoints
 
-`GET /activities` is **not implemented**. The write side (`POST /activities`) is live; the read
-feed is deferred pending decisions on filtering/pagination shape (per-record feed vs. global
-activity log). Do not add a GET handler without first updating this note and the research artifact
+`GET /activities` is **implemented** as an unfiltered list, ordered by `OccurredAt` descending.
+Anchor-scoped filtering (`?contactId=`, `?companyId=`, `?dealId=`), type filtering (`?type=`),
+date-range, and pagination are all deferred — the endpoint returns all activity rows with no
+filter parameters accepted (scoped deferral, not a design decision). Before adding
+filtering/pagination, update this note and the research artifact
 (`.devclaw/research/activities.md`).
 
 ### Deduplication of legacy Tests project
@@ -187,7 +189,8 @@ them in. Do not omit or rename a section.
 | `.devclaw/research/deals.md` | Deals/Kanban surface, stage progression, forecasting, rotting | merged |
 | `.devclaw/research/activities.md` | Activity log, per-record feed, task surface | merged |
 | `.devclaw/research/pipelines.md` | Pipeline CRUD, stage management, metrics | merged |
-| `.devclaw/research/notifications.md` | Notification entity, trigger taxonomy, dispatch model, mention surface | **this PR** |
+| `.devclaw/research/notifications.md` | Notification entity, trigger taxonomy, dispatch model, mention surface | merged |
+| `.devclaw/research/deploy-shape.md` | Deploy shape, Dockerfile multi-stage build, DATABASE_URL precedence | merged |
 
 The `notifications.md` artifact defines: `Notification` entity (`Id`, `RecipientUserId`, `Trigger`,
 `Title`, `Body`, `RelatedEntityId`, `RelatedEntityType`, `IsRead`, `CreatedAt`); `NotificationTrigger`
