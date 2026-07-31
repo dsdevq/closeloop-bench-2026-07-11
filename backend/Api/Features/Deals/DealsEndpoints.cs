@@ -43,6 +43,15 @@ public static class DealsEndpoints
 
     private static async Task<IResult> CreateDeal(CreateDealRequest req, CrmDbContext db)
     {
+        var stage = await db.PipelineStages
+            .Where(s => s.Id == req.PipelineStageId)
+            .SingleOrDefaultAsync();
+
+        if (stage is null || stage.PipelineId != req.PipelineId)
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]> { ["pipelineStageId"] = ["Stage does not belong to the given pipeline."] },
+                statusCode: StatusCodes.Status422UnprocessableEntity);
+
         Deal deal;
         try
         {
@@ -100,6 +109,13 @@ public static class DealsEndpoints
                 new Dictionary<string, string[]> { [ex.ParamName ?? "stage"] = [ex.Message] },
                 statusCode: StatusCodes.Status422UnprocessableEntity);
         }
+
+        var stageChangeActivity = Activity.Create(
+            ActivityType.StageChange,
+            $"Stage changed to {stage.Name}",
+            DateTime.UtcNow,
+            dealId: deal.Id);
+        db.Activities.Add(stageChangeActivity);
 
         var ownerChanged = req.OwnerId.HasValue && req.OwnerId.Value != currentOwnerId;
         if (ownerChanged)
