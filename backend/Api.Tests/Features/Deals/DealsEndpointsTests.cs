@@ -312,4 +312,43 @@ public sealed class DealsEndpointsTests : IDisposable
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, patchResp.StatusCode);
     }
+
+    [Fact]
+    public async Task PostDeal_StageBelongsToDifferentPipeline_Returns422()
+    {
+        var (pipelineId, _) = await SeedPipelineAsync();
+        var (_, otherStageId) = await SeedPipelineAsync();
+
+        // PipelineStageId belongs to a different pipeline than PipelineId
+        var req = new CreateDealRequest("Cross-Pipeline Deal", 1000m, Guid.NewGuid(), pipelineId, otherStageId);
+
+        var response = await _client.PostAsJsonAsync("/deals", req);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchDealStage_ValidStageChange_InsertsStageChangeActivity()
+    {
+        var (pipelineId, stage1Id, stage2Id) = await SeedPipelineWithTwoStagesAsync();
+        var ownerId = Guid.NewGuid();
+        var createResp = await _client.PostAsJsonAsync("/deals",
+            new CreateDealRequest("Activity Test Deal", 7500m, ownerId, pipelineId, stage1Id));
+        Assert.Equal(HttpStatusCode.Created, createResp.StatusCode);
+        var deal = await createResp.Content.ReadFromJsonAsync<DealResponse>();
+        Assert.NotNull(deal);
+
+        var patchResp = await _client.PatchAsJsonAsync($"/deals/{deal.Id}/stage",
+            new PatchDealStageRequest(stage2Id));
+
+        Assert.Equal(HttpStatusCode.OK, patchResp.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
+        var activities = await db.Activities.ToListAsync();
+        Assert.Single(activities);
+        Assert.Equal(ActivityType.StageChange, activities[0].Type);
+        Assert.Equal(deal.Id, activities[0].DealId);
+        Assert.Contains("Qualified", activities[0].Note);
+    }
 }
