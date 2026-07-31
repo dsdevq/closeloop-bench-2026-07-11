@@ -75,14 +75,10 @@ public static class NotificationsEndpoints
                 new Dictionary<string, string[]> { ["userId"] = ["userId is required."] },
                 statusCode: StatusCodes.Status422UnprocessableEntity);
 
-        var unread = await db.Notifications
+        await db.Notifications
             .Where(n => n.RecipientUserId == userId.Value && !n.IsRead)
-            .ToListAsync();
+            .ExecuteUpdateAsync(setters => setters.SetProperty(n => n.IsRead, true));
 
-        foreach (var n in unread)
-            n.MarkRead();
-
-        await db.SaveChangesAsync();
         return Results.NoContent();
     }
 }

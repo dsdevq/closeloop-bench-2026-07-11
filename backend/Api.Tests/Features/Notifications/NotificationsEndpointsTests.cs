@@ -5,7 +5,9 @@ using Domain.Entities;
 using Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -14,20 +16,24 @@ namespace Api.Tests.Features.Notifications;
 
 public sealed class NotificationsEndpointsTests : IDisposable
 {
+    private readonly SqliteConnection _connection;
     private readonly WebApplicationFactory<Program> _factory;
     private readonly HttpClient _client;
 
     public NotificationsEndpointsTests()
     {
+        // SQLite in-memory requires a persistent connection — data disappears when the connection closes.
+        // A shared connection lets both the app's DbContext and the seed scopes see the same database.
+        _connection = new SqliteConnection("DataSource=:memory:");
+        _connection.Open();
+
         _factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
-                builder.UseSetting("ConnectionStrings:DefaultConnection", "Host=localhost;Database=test;");
+                builder.UseSetting("ConnectionStrings:DefaultConnection", "DataSource=:memory:");
 
                 builder.ConfigureTestServices(services =>
                 {
-                    var dbName = "NotificationsTest_" + Guid.NewGuid();
-
                     var optConfigType = typeof(IDbContextOptionsConfiguration<CrmDbContext>);
                     foreach (var d in services.Where(d => d.ServiceType == optConfigType).ToList())
                         services.Remove(d);
@@ -35,13 +41,20 @@ public sealed class NotificationsEndpointsTests : IDisposable
                         services.Remove(d);
 
                     services.AddDbContext<CrmDbContext>(options =>
-                        options.UseInMemoryDatabase(dbName));
+                        options.UseSqlite(_connection)
+                               // Suppress the Npgsql-vs-SQLite model-snapshot diff warning
+                               // so migrations can run; type mapping differences are cosmetic here.
+                               .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
                 });
             });
         _client = _factory.CreateClient();
     }
 
-    public void Dispose() => _factory.Dispose();
+    public void Dispose()
+    {
+        _factory.Dispose();
+        _connection.Dispose();
+    }
 
     private async Task SeedNotificationAsync(Notification notification)
     {

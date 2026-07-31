@@ -118,22 +118,27 @@ affordances the API must support.
   to the pipeline's rotting threshold. Adding `lastActivityAt: DateTime?` and `isRotting: bool`
   to the deal list/board response costs one join and requires no domain-layer change.
 
-### 4. Attio's `stageHistory` array on deal detail for time-in-stage analytics
+### 4. Attio's `stageHistory` array on deal detail for time-in-stage analytics — **deferred**
 
-- **What**: The deal detail response includes a `stageHistory` array:
+- **What (target design)**: The deal detail response would include a `stageHistory` array:
   `[{ fromStageId, toStageId, enteredAt, exitedAt, durationDays }]` — one entry per stage
-  transition. This is projected from the append-only `StageTransition` child collection
-  (see `.devclaw/research/domain-model.md` Borrowed §3) and lets the UI render a timeline of
-  the deal's journey through the pipeline stages without building a separate timeline query.
-- **From**: Attio public API v2 — `GET /v2/lists/{list_id}/entries/{entry_id}` returns a
-  `stage_history` array with `{ from_stage_id, to_stage_id, changed_at }` per transition; Attio's
-  board view uses this to compute "time in current stage" displayed on the entry card.
-- **Why it fits**: The `StageTransition` table is append-only (`DealId`, `FromStageId`,
-  `ToStageId`, `ChangedAt`, `ChangedBy` — see AGENTS.md Key decisions). Projecting this into a
-  `stageHistory` array in the deal detail response is a pure read-side aggregation. "Days in
-  current stage" can be computed as `now() - stageHistory.last().enteredAt`, surfaced as
-  `daysInCurrentStage: int` on the deal card to warn reps when a deal is stalled even before
-  it crosses the rotting threshold.
+  transition. This pattern is borrowed from Attio public API v2 —
+  `GET /v2/lists/{list_id}/entries/{entry_id}` returns `stage_history` with
+  `{ from_stage_id, to_stage_id, changed_at }` per transition; Attio's board view uses this to
+  compute "time in current stage" displayed on the entry card.
+- **Why it fits**: A `StageTransition` append-only child table (`DealId`, `FromStageId`,
+  `ToStageId`, `ChangedAt`, `ChangedBy`) would let the API project stage history as a pure
+  read-side aggregation. "Days in current stage" could be computed as
+  `now() - stageHistory.last().enteredAt`, surfaced as `daysInCurrentStage: int` on the deal card
+  to warn reps when a deal is stalled even before it crosses the rotting threshold.
+- **Status — explicitly deferred**: No `StageTransition` entity, migration, or endpoint exists
+  in this iteration. `PATCH /deals/{id}/stage` advances the deal's `PipelineStageId` FK in place;
+  no transition row is written. Stage-history analytics are intentionally out of scope for the
+  current MVP — the design above records the intended approach so the next engineer does not need
+  to re-research it. Before implementing, create the `StageTransition` entity in
+  `backend/Domain/Entities/`, add a migration, and project `stageHistory` in the deal-detail
+  response. (Same deferral pattern as `Activity.DueAt`/`IsDone` task fields and the
+  anchor-scoped `GET /activities` filtering — see AGENTS.md § Intentionally deferred endpoints.)
 
 ### 5. Salesforce's `CloseDate` field with overdue flagging in the list and Kanban view
 

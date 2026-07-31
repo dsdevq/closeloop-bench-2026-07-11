@@ -21,8 +21,7 @@ RUN dotnet publish backend/Api/Api.csproj \
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
 COPY --from=dotnet-build /publish ./
-# Angular bundle placed in wwwroot/; Program.cs must call UseDefaultFiles()+UseStaticFiles()
-# to serve it — that hookup is a tracked gap (see AGENTS.md § Known gaps / Docker).
+# Angular bundle placed in wwwroot/; served by UseDefaultFiles()+UseStaticFiles() in Program.cs.
 COPY --from=node-build /src/frontend/dist/frontend/browser ./wwwroot/
 ENV ASPNETCORE_ENVIRONMENT=Production
 EXPOSE 8080

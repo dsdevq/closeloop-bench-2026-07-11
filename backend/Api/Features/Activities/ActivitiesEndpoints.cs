@@ -93,7 +93,6 @@ public static class ActivitiesEndpoints
 
         return MentionPattern.Matches(note)
             .Select(m => Guid.Parse(m.Groups[1].Value))
-            .Distinct()
             .ToList();
     }
 }
