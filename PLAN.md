@@ -36,6 +36,18 @@ Done = every foundation milestone checked + done-gate green.
 - [x] M7 Done-gate coherence — all prior drift findings resolved, done-gate green
 - [x] M8 Steering fixes — ContactCompanyLink false claims corrected; shipped/deferred markers added;
        row caps on list endpoints; AGENTS.md Key decisions updated
+- [x] M9 Steering fixes — GET /deals row cap (Take(200)/OrderBy Title) + test; domain-model.md
+       summary table corrected with SHIPPED/DIVERGED/DEFERRED markers
+
+## Tasks — M9 (done)
+
+- [x] Add Take(200)/OrderBy(Title) row cap to GET /deals in DealsEndpoints.cs
+- [x] Add GetDeals_MoreThan200_CapsAt200OrderedByTitle test in DealsEndpointsTests.cs
+- [x] Update domain-model.md summary table to reflect shipped schema (ContactCompanyLink→FK, StageTransition DEFERRED, Activity fields, cardinality)
+- [x] Add §Diverged D and §Diverged E to domain-model.md (ContactCompanyLink and Activity anchor divergences)
+- [x] Add DEFERRED/SHIPPED status callouts to Borrowed §1 and §3 in domain-model.md
+- [x] Update AGENTS.md to include GET /deals in row-cap deferral section and Key decisions
+- [x] Update PLAN.md
 
 ## Tasks — M8 (done)
 

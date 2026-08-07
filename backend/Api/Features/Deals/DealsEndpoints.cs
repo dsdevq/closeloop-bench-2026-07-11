@@ -22,6 +22,8 @@ public static class DealsEndpoints
     private static async Task<IResult> ListDeals(CrmDbContext db)
     {
         var deals = await db.Deals
+            .OrderBy(d => d.Title)
+            .Take(200)
             .Select(d => new DealResponse(
                 d.Id, d.Title, d.Amount, d.CloseDate, d.OwnerId,
                 d.PipelineId, d.PipelineStageId, d.CompanyId, d.ContactId))

@@ -328,6 +328,32 @@ public sealed class DealsEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task GetDeals_MoreThan200_CapsAt200OrderedByTitle()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
+
+        var pipeline = Pipeline.Create("Row Cap Pipeline");
+        pipeline.AddStage("Stage One", order: 0);
+        db.Pipelines.Add(pipeline);
+        await db.SaveChangesAsync();
+        var stage = pipeline.Stages[0];
+
+        var ownerId = Guid.NewGuid();
+        for (var i = 1; i <= 201; i++)
+            db.Deals.Add(Deal.Create($"Deal {i:D3}", 0m, ownerId, pipeline.Id, stage.Id));
+        await db.SaveChangesAsync();
+
+        var response = await _client.GetAsync("/deals");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<DealResponse[]>();
+        Assert.NotNull(body);
+        Assert.Equal(200, body.Length);
+        Assert.Equal("Deal 001", body[0].Title);
+    }
+
+    [Fact]
     public async Task PatchDealStage_ValidStageChange_InsertsStageChangeActivity()
     {
         var (pipelineId, stage1Id, stage2Id) = await SeedPipelineWithTwoStagesAsync();

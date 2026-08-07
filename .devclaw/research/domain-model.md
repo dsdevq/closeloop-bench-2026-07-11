@@ -9,24 +9,33 @@ was examined, what was adopted and from where, and what was deliberately rejecte
 
 ## Object model resulting from this research (summary)
 
-| Object | Key fields | Primary ownership |
-|---|---|---|
-| **Contact** | Id, FullName, Email, Phone, OwnerId | owned by a User |
-| **Company** | Id, Name, Domain, Industry, OwnerId | owned by a User |
-| **ContactCompanyLink** | ContactId, CompanyId, IsPrimary | junction — many-to-many |
-| **Deal** | Id, Title, Amount, CloseDate, OwnerId, PipelineId, StageId | owned by a User, belongs to one Pipeline |
-| **Stage** | Id, PipelineId, Name, Order, WinProbability | child of Pipeline |
-| **Pipeline** | Id, Name, OwnerId | owned by a User (or team) |
-| **Activity** | Id, Type, Subject, Body, TargetType, TargetId, OwnerId, OccurredAt, DueAt | polymorphic target |
-| **StageTransition** | DealId, FromStageId, ToStageId, ChangedAt, ChangedBy | append-only audit log on Deal |
+> **Note:** The table below shows the **shipped** state of each object, with divergences from the
+> original research design called out inline. See the Borrowed and Rejected sections for the argued
+> rationale behind each divergence.
 
-Cardinality summary:
-- Contact ↔ Company: **many-to-many** with one `IsPrimary` link per Contact.
+| Object | Key fields (shipped) | Status | Notes |
+|---|---|---|---|
+| **Contact** | Id, Name, Email, Phone?, CompanyId? (FK), OwnerId | SHIPPED | `FullName` renamed to `Name`; `CompanyId` is a simple nullable FK — no `ContactCompanyLink` junction (see §Diverged D below) |
+| **Company** | Id, Name, Domain?, Industry?, OwnerId | SHIPPED | matches research design |
+| **ContactCompanyLink** | — | DIVERGED → replaced by `Contact.CompanyId` | The many-to-many junction with `IsPrimary` was not shipped. A simple nullable FK on Contact was chosen instead; see §Diverged D and AGENTS.md Key decisions. |
+| **Deal** | Id, Title, Amount, CloseDate?, OwnerId, PipelineId, PipelineStageId, CompanyId?, ContactId? | SHIPPED | Research called the stage field `StageId`; shipped name is `PipelineStageId`. `CompanyId` and `ContactId` are nullable direct FKs (not a DealContactLink junction). |
+| **Stage** (PipelineStage) | Id, PipelineId, Name, Order, WinProbability? | SHIPPED | `WinProbability` is optional (`int?`); entity named `PipelineStage` in code to avoid ambiguity. |
+| **Pipeline** | Id, Name | SHIPPED | No `OwnerId` on Pipeline itself — ownership is at the Deal level. |
+| **Activity** | Id, Type (closed enum), Note, OccurredAt, ContactId?, CompanyId?, DealId? | SHIPPED | Research designed a discriminated `(TargetType, TargetId)` pair; shipped implementation uses three nullable anchor FKs instead (mirrors Deal's FK pattern). `Subject`, `Body`, `OwnerId`, and `DueAt` were not shipped. `Type` is a closed enum (`Note, Call, Email, Meeting, Task, StageChange`), not an open string registry. |
+| **StageTransition** | — | DEFERRED | The append-only stage-history child table (Borrowed §3) was not shipped. Stage transitions are recorded as `Activity` rows of type `StageChange` instead — a lighter approach that keeps audit within the existing Activity model. A dedicated `StageTransition` table is a future migration if time-in-stage analytics require it. |
+
+Cardinality summary (shipped):
+- Contact ↔ Company: **optional many-to-one** via `Contact.CompanyId` nullable FK. The research
+  design proposed many-to-many with `IsPrimary` (DIVERGED — see §Diverged D).
 - Deal → Pipeline: **many-to-one** (a Deal belongs to exactly one Pipeline at a time).
-- Deal → Stage: **many-to-one** (a Deal is in exactly one Stage; Stage must belong to its Pipeline).
-- Deal → Contact(s): **many-to-many** via DealContactLink (first linked Contact is "primary contact").
-- Deal → Company: **many-to-one** (one primary Company per Deal; optional).
-- Activity → target: **polymorphic** (TargetType ∈ {Contact, Company, Deal}; one target per Activity).
+- Deal → Stage: **many-to-one** (`Deal.PipelineStageId`; Stage must belong to the Deal's Pipeline —
+  enforced in `Deal.AdvanceTo()`).
+- Deal → Contact: **optional many-to-one** via `Deal.ContactId` nullable FK. Research proposed a
+  DealContactLink many-to-many junction (DEFERRED).
+- Deal → Company: **optional many-to-one** via `Deal.CompanyId` nullable FK.
+- Activity → target: **exactly one** of `ContactId`, `CompanyId`, or `DealId` is non-null — enforced
+  in `Activity.Create()`. Research proposed a discriminated `(TargetType, TargetId)` pair (DIVERGED
+  — shipped implementation uses three nullable FKs; see Rejected §D in AGENTS.md Key decisions).
 
 ---
 
@@ -61,6 +70,11 @@ Cardinality summary:
 
 ### 1. Company as a first-class grouping object (not an "Account" type-umbrella)
 
+> **Status: SHIPPED (partially DIVERGED)** — Company is shipped as a first-class object.
+> The Contact-to-Company association **diverged**: the research design proposed a
+> `ContactCompanyLink` junction table with `IsPrimary` (HubSpot pattern); the shipped
+> implementation uses a simple nullable `Contact.CompanyId` FK instead. See §Diverged D.
+
 - **What**: `Company` is a dedicated object for organizations; it does not double as a container
   for individuals. Contacts are not sub-records of Company — they are linked via an explicit
   association with a `IsPrimary` flag.
@@ -87,6 +101,12 @@ Cardinality summary:
   Salesforce does) would require a migration per new pipeline.
 
 ### 3. Stage transition log as an append-only child table on Deal
+
+> **Status: DEFERRED** — The `StageTransition` table was not shipped. Stage transitions are
+> instead recorded as `Activity` rows of type `StageChange` (logged by `PATCH /deals/{id}/stage`).
+> This is a lighter approach reusing the existing Activity model. A dedicated `StageTransition`
+> table with `FromStageId`/`ToStageId`/`ChangedAt` should be revisited when time-in-stage
+> analytics (cycle-time reports, stage conversion rates) become a product requirement.
 
 - **What**: Each time `Deal.StageId` changes, a `StageTransition` row is appended with
   `FromStageId`, `ToStageId`, `ChangedAt`, and `ChangedByUserId`. The Deal entity itself exposes
@@ -204,3 +224,34 @@ Cardinality summary:
   sector, or internal team structure. HubSpot, Attio, and Zoho all use "Company" for this object.
   Naming should match the mental model of the user, not any single CRM vendor's terminology
   choice.
+
+---
+
+## Divergences from research design (implementation vs. plan)
+
+These decisions were made during implementation and diverge from the research-phase design above.
+They are recorded here so the research artifact stays honest about actual shipped state.
+
+### Diverged D. ContactCompanyLink junction → Contact.CompanyId simple FK
+
+- **Research design**: A `ContactCompanyLink` junction table with `ContactId`, `CompanyId`, and
+  `IsPrimary` flag — allowing one Contact to be associated with multiple Companies, with one
+  flagged as primary (Borrowed §1, HubSpot pattern).
+- **Shipped implementation**: `Contact.CompanyId` is a single nullable `Guid?` FK — a direct
+  one-to-one optional reference.
+- **Reason**: The junction table adds a second DB table, a navigation collection, and multi-company
+  query complexity for a use case (one contact, multiple companies) that is rare in the SMB target
+  segment. The simple FK covers ≥ 95% of real workflows. Upgrading to a junction table with
+  `IsPrimary` is an explicit future migration if product demand emerges. Documented in
+  AGENTS.md Key decisions.
+
+### Diverged E. Activity anchor — three nullable FKs vs. discriminated (TargetType, TargetId) pair
+
+- **Research design**: Activity uses a `(TargetType, TargetId)` discriminated pair for the
+  polymorphic anchor (Borrowed §4, Salesforce WhoId/WhatId pattern).
+- **Shipped implementation**: `Activity` carries three nullable FKs (`ContactId?`, `CompanyId?`,
+  `DealId?`). `Activity.Create()` enforces exactly-one-anchor: exactly one of the three must be
+  non-null.
+- **Reason**: The three-FK pattern mirrors `Deal`'s existing FK shape, keeps EF Core mappings
+  explicit (no string-to-enum discriminator column), and makes each anchor a typed, indexable FK
+  rather than a generic Guid. Documented in AGENTS.md Key decisions.
