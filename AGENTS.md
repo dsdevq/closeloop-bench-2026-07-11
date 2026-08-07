@@ -112,10 +112,10 @@ middleware, session cookie, or a thin identity proxy in front of the API.
 
 ### Intentionally deferred endpoints
 
-`GET /contacts`, `GET /companies`, and `GET /activities` are **implemented** as row-capped lists
-(max 200 rows, ordered by name ascending for contacts/companies, by `OccurredAt` descending for
-activities). They accept **no filter, sort, or pagination query parameters**. All three are
-scoped deferrals:
+`GET /contacts`, `GET /companies`, `GET /activities`, and `GET /deals` are **implemented** as
+row-capped lists (max 200 rows, ordered by name/title ascending for contacts/companies/deals, by
+`OccurredAt` descending for activities). They accept **no filter, sort, or pagination query
+parameters**. All four are scoped deferrals:
 
 - Cursor pagination envelope (`?limit=&after=` / `paging.next.after`) is deferred pending
   PostgreSQL/Npgsql keyset-predicate validation — see Key decisions above.
@@ -315,11 +315,11 @@ Also: `Results.ValidationProblem` must receive `statusCode: StatusCodes.Status42
   future migration if product demand emerges. All research docs that referenced
   `ContactCompanyLink.IsPrimary` have been corrected to reflect the shipped FK model.
 - **List endpoint row cap (200 rows, cursor pagination deferred)**: `GET /contacts`,
-  `GET /companies`, and `GET /activities` each cap results at 200 rows (via `.Take(200)` in the
-  LINQ query) to guard against unbounded table scans at scale. The HubSpot-style cursor pagination
-  envelope (`?limit=&after=` / `paging.next.after`) described in `.devclaw/research/contacts.md`
-  Borrowed §3 is DEFERRED: implementing a keyset cursor predicate requires validation against the
-  PostgreSQL/Npgsql engine (EF Core InMemory translates OR-based keyset predicates in
-  client-side semantics that may differ from Npgsql's SQL translation). Cursor pagination must be
-  added with a real PostgreSQL integration test (Testcontainers or docker-compose service) before
-  it can be marked shipped.
+  `GET /companies`, `GET /activities`, and `GET /deals` each cap results at 200 rows (via
+  `.Take(200)` in the LINQ query) to guard against unbounded table scans at scale. The HubSpot-style
+  cursor pagination envelope (`?limit=&after=` / `paging.next.after`) described in
+  `.devclaw/research/contacts.md` Borrowed §3 is DEFERRED: implementing a keyset cursor predicate
+  requires validation against the PostgreSQL/Npgsql engine (EF Core InMemory translates OR-based
+  keyset predicates in client-side semantics that may differ from Npgsql's SQL translation). Cursor
+  pagination must be added with a real PostgreSQL integration test (Testcontainers or docker-compose
+  service) before it can be marked shipped.
