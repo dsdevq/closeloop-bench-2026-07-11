@@ -112,12 +112,20 @@ middleware, session cookie, or a thin identity proxy in front of the API.
 
 ### Intentionally deferred endpoints
 
-`GET /activities` is **implemented** as an unfiltered list, ordered by `OccurredAt` descending.
-Anchor-scoped filtering (`?contactId=`, `?companyId=`, `?dealId=`), type filtering (`?type=`),
-date-range, and pagination are all deferred — the endpoint returns all activity rows with no
-filter parameters accepted (scoped deferral, not a design decision). Before adding
-filtering/pagination, update this note and the research artifact
-(`.devclaw/research/activities.md`).
+`GET /contacts`, `GET /companies`, and `GET /activities` are **implemented** as row-capped lists
+(max 200 rows, ordered by name ascending for contacts/companies, by `OccurredAt` descending for
+activities). They accept **no filter, sort, or pagination query parameters**. All three are
+scoped deferrals:
+
+- Cursor pagination envelope (`?limit=&after=` / `paging.next.after`) is deferred pending
+  PostgreSQL/Npgsql keyset-predicate validation — see Key decisions above.
+- Filter + sort query parameters (`?filter=`, `?sort=`) are deferred.
+- Inline related-record embedding (primaryCompany on contact detail, primaryContact on company
+  detail, sub-resource endpoints) is deferred — see `.devclaw/research/contacts.md` and
+  `.devclaw/research/companies.md` for per-section status markers.
+
+Before adding any of the above, update this note, the relevant research artifact, and the
+`verify_cmd` test gate if new test layers are added.
 
 ### Deduplication of legacy Tests project
 
@@ -296,3 +304,22 @@ Also: `Results.ValidationProblem` must receive `statusCode: StatusCodes.Status42
 - `NotificationTrigger` is a closed enum (four values: DealAssigned, DealStageChanged, ContactAssigned, ActivityMention). Values carry explicit integers (0, 1, 3, 4) to preserve DB row mapping after `DealRotting`=2 and `TaskDue`=5 were deleted. A new trigger is an additive enum extension with an explicit next integer — this was the explicit reason for rejecting Salesforce's configurable rule-engine model (see `.devclaw/research/notifications.md` §Rejected A).
 - `INotificationDispatcher` lives at the Domain boundary; the concrete implementation sits in Infrastructure. `POST /activities` calls `ActivityMentionAsync` post-SaveChanges; the dispatcher does a second SaveChanges (eventual consistency, acceptable for informational notifications). All four dispatcher methods create real `Notification` rows and are wired to real, reachable callers (see the dispatcher table above: `PATCH /deals/{id}/stage`, `PATCH /contacts/{id}/owner`, `POST /activities`).
 - `@mention` syntax in `Activity.Note` is parsed in the application (endpoint) layer, not in the `Activity` domain entity — the entity stays `string?`-typed; mention resolution is an application concern injected via `INotificationDispatcher.ActivityMentionAsync`. Pattern: `@<uuid>` (UUID rather than display name). Email/SMS fallback delivery was explicitly deferred (see `.devclaw/research/notifications.md` §Rejected D).
+- **ContactCompanyLink junction → Contact.CompanyId simple FK**: The domain-model research
+  (`.devclaw/research/domain-model.md` Borrowed §1) proposed a `ContactCompanyLink` junction
+  table with `ContactId`, `CompanyId`, and `IsPrimary` flag (borrowed from HubSpot's many-to-many
+  contact-company association). The shipped implementation diverged: `Contact` carries a single
+  `CompanyId: Guid?` nullable FK (a one-to-one optional reference). Reason: the junction table
+  adds a second DB table, a navigation collection, and multi-company query complexity for a use
+  case (one contact, multiple companies) that is rare in the SMB target segment. The simple FK
+  covers ≥ 95% of real workflows; upgrading to a junction table with IsPrimary is an explicit
+  future migration if product demand emerges. All research docs that referenced
+  `ContactCompanyLink.IsPrimary` have been corrected to reflect the shipped FK model.
+- **List endpoint row cap (200 rows, cursor pagination deferred)**: `GET /contacts`,
+  `GET /companies`, and `GET /activities` each cap results at 200 rows (via `.Take(200)` in the
+  LINQ query) to guard against unbounded table scans at scale. The HubSpot-style cursor pagination
+  envelope (`?limit=&after=` / `paging.next.after`) described in `.devclaw/research/contacts.md`
+  Borrowed §3 is DEFERRED: implementing a keyset cursor predicate requires validation against the
+  PostgreSQL/Npgsql engine (EF Core InMemory translates OR-based keyset predicates in
+  client-side semantics that may differ from Npgsql's SQL translation). Cursor pagination must be
+  added with a real PostgreSQL integration test (Testcontainers or docker-compose service) before
+  it can be marked shipped.

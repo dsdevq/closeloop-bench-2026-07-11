@@ -25,6 +25,7 @@ public static class ActivitiesEndpoints
     {
         var activities = await db.Activities
             .OrderByDescending(a => a.OccurredAt)
+            .Take(200)
             .Select(a => new { a.Id, a.Type, a.Note, a.OccurredAt, a.ContactId, a.CompanyId, a.DealId })
             .ToListAsync();
 
