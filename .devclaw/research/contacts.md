@@ -72,6 +72,9 @@ write-many affordances the API must support.
   projection parameter makes the same endpoint usable for both card and full-detail rendering,
   matching the existing Contact entity's four fields exactly.
 
+> **Status: DEFERRED** — `GET /contacts/{id}?view=compact` projection parameter is not yet
+> shipped. The current detail endpoint returns all fields for every request.
+
 ### 2. HubSpot's primary-company association surfaced inline in contact detail
 
 - **What**: The Contact detail record embeds the associated primary company as a nested object —
@@ -82,10 +85,16 @@ write-many affordances the API must support.
   expands associated company records inline. The HubSpot Contact detail UI surfaces the "Primary
   Company" block in the right-hand association panel with company name, domain, and a click-through
   link.
-- **Why it fits**: The domain model already defines `ContactCompanyLink.IsPrimary`
-  (see `.devclaw/research/domain-model.md` Borrowed §1). The API should project this as
-  `primaryCompany` (embedded) and `additionalCompanies[]` (array of id+name stubs) so the list
+- **Why it fits**: The `Contact` entity carries a `CompanyId: Guid?` FK that identifies the
+  contact's one associated company (the domain-model research proposed a `ContactCompanyLink`
+  junction with `IsPrimary`, but the shipped implementation uses a simpler single-FK — see AGENTS.md
+  Key decisions). The API should project this FK as an embedded `primaryCompany` object so the list
   and detail views never need a separate companies lookup for the common case.
+
+> **Status: DEFERRED** — The inline `primaryCompany` embedding is not yet shipped. The current
+> `GET /contacts` and `GET /contacts/{id}` endpoints return a bare `companyId` (Guid?) field.
+> Implement by joining the company record in the LINQ projection and adding
+> `primaryCompany: { id, name, domain }` to `ContactResponse`.
 
 ### 3. HubSpot's cursor-based pagination for the contact list endpoint
 
@@ -101,6 +110,12 @@ write-many affordances the API must support.
   rows when the total set shifts between pages. closeloop's list endpoint will emit a keyset cursor
   derived from `(createdAt, id)` so pagination is deterministic and index-backed.
 
+> **Status: DEFERRED** — Full HubSpot-style cursor pagination (`?limit=&after=` envelope with
+> `paging.next.after`) is not yet shipped. `GET /contacts` currently returns up to 200 rows
+> ordered by name (a row cap added in M8 to guard against unbounded queries) with no pagination
+> envelope. Cursor pagination must be validated against the PostgreSQL engine (Npgsql LINQ
+> translation) before shipping; see AGENTS.md for the deferred-pagination note.
+
 ### 4. Pipedrive's orthogonal filter + sort + field-projection parameters on list endpoint
 
 - **What**: Pipedrive's `GET /v1/persons` accepts independent query parameters: `filter_id` (ID
@@ -113,6 +128,9 @@ write-many affordances the API must support.
   (a set of field-operator-value triples as a query param), and `fields` (comma-delimited
   projection) as independent query parameters so any combination composes. This avoids the need for
   a separate search endpoint while remaining fully URL-expressible for bookmarking and sharing.
+
+> **Status: DEFERRED** — Filter, sort, and field-projection query parameters are not yet shipped.
+> `GET /contacts` currently applies no filtering and uses a fixed name-ascending sort.
 
 ### 5. Attio's inline-editable detail fields backed by a PATCH partial-update endpoint
 
@@ -129,6 +147,9 @@ write-many affordances the API must support.
   `Update(...)` method that accepts nullable overrides. This is strictly more correct than PUT
   semantics, which would force the client to re-send all fields to avoid nulling them out.
 
+> **Status: DEFERRED** — `PATCH /contacts/{id}` (field-level partial update) is not yet shipped.
+> The only contact PATCH endpoint currently is `PATCH /contacts/{id}/owner`.
+
 ### 6. Zoho's mass-update action for bulk field edits on a selection of contacts
 
 - **What**: Selecting multiple contacts in the list view and choosing "Mass Update" applies the
@@ -144,6 +165,9 @@ write-many affordances the API must support.
   `{ ids: [uuid, ...], fields: { ... } }` is the REST-idiomatic equivalent and enables the list
   view's bulk-select affordance. Limiting to fields that exist on the entity (name, email, phone,
   companyId) keeps the implementation bounded.
+
+> **Status: DEFERRED** — Batch mass-update endpoint (`POST /contacts/actions/mass_update` or
+> `PATCH /contacts` with `ids[]`) is not yet shipped.
 
 ### 7. HubSpot's email-as-deduplication-key with upsert semantics for CSV import
 
@@ -163,6 +187,8 @@ write-many affordances the API must support.
   `{ results: [{ row, status, contactId, error }] }` envelope in the response mirrors HubSpot's
   row-level outcome model and lets the API caller surface a diff summary (N created, M updated,
   K failed) without a separate status-poll endpoint.
+
+> **Status: DEFERRED** — CSV import endpoint (`POST /contacts/import`) is not yet shipped.
 
 ---
 
@@ -225,13 +251,14 @@ write-many affordances the API must support.
 - **Source**: Attio public API v2 — `People` records `companies` attribute is a multi-value
   relation; Attio UI People record view showing a comma-separated list of linked company chips
   with no hierarchy.
-- **Reason rejected**: The domain model uses `ContactCompanyLink.IsPrimary` to designate one
-  primary company per contact (see `.devclaw/research/domain-model.md` Borrowed §1). The API
-  detail response must reflect this by surfacing `primaryCompany` prominently and
-  `additionalCompanies[]` as a secondary list. An equal-weight display would hide information the
-  domain explicitly encodes and would require the frontend to independently determine which company
-  to show in list-view column truncation. The HubSpot model (Borrowed §2) is adopted instead
-  because it mirrors the `IsPrimary` flag directly.
+- **Reason rejected**: The shipped domain model uses `Contact.CompanyId: Guid?` — a single
+  nullable FK that allows exactly zero or one company per contact (not a multi-value
+  `ContactCompanyLink` junction as the domain-model research originally proposed; see AGENTS.md
+  Key decisions). This means the contact already has an unambiguous primary company at the model
+  level: the one company (if any) in the FK. An equal-weight multi-company display would require
+  changing the domain model to support multiple companies first, a change deferred to a future
+  milestone. The inline `primaryCompany` embedding from Borrowed §2 remains the correct target
+  design, pending that deferral being lifted.
 
 ### E. Zoho's tabbed Info/Timeline split in the contact detail view
 

@@ -34,6 +34,17 @@ Done = every foundation milestone checked + done-gate green.
 - [x] M5 Notifications — entity, four-trigger enum, dispatcher, three API endpoints, all callers wired
 - [x] M6 Deploy shape — root Dockerfile (multi-stage), DATABASE_URL precedence, CI test job
 - [x] M7 Done-gate coherence — all prior drift findings resolved, done-gate green
+- [x] M8 Steering fixes — ContactCompanyLink false claims corrected; shipped/deferred markers added;
+       row caps on list endpoints; AGENTS.md Key decisions updated
+
+## Tasks — M8 (done)
+
+- [x] Fix ContactCompanyLink.IsPrimary false claims in contacts.md:85,228 and companies.md:130
+- [x] Add shipped/deferred status markers to all Borrowed sections in contacts.md and companies.md
+- [x] Add Take(200) row cap to GET /contacts, GET /companies, GET /activities
+- [x] Add ContactCompanyLink→Contact.CompanyId FK Key decisions entry to AGENTS.md
+- [x] Update AGENTS.md "Intentionally deferred endpoints" to cover contacts/companies list caps
+- [x] Update PLAN.md
 
 ## Tasks — M7 (done)
 

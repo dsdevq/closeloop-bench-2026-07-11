@@ -20,6 +20,8 @@ public static class CompaniesEndpoints
     private static async Task<IResult> ListCompanies(CrmDbContext db)
     {
         var companies = await db.Companies
+            .OrderBy(c => c.Name)
+            .Take(200)
             .Select(c => new CompanyResponse(c.Id, c.Name, c.Domain, c.Industry, c.OwnerId))
             .ToListAsync();
         return Results.Ok(companies);

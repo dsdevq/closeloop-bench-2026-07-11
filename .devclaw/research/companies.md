@@ -79,6 +79,9 @@ write affordances the API must support.
   exports where domain is the reliable deduplication column. The field is nullable so private
   companies without a public web presence can still be created without a domain.
 
+> **Status: DEFERRED** — Domain-keyed 409 conflict detection on `POST /companies` is not yet
+> shipped. The current endpoint creates a new company regardless of domain uniqueness.
+
 ### 2. Pipedrive's inline summary counts on the list endpoint
 
 - **What**: The Company list response includes `openDealsCount`, `wonDealsCount`, `lostDealsCount`,
@@ -93,6 +96,10 @@ write affordances the API must support.
   prioritise without clicking into each record. Including these counts on the list endpoint avoids
   N+1 round-trips, and they can be computed efficiently in a single SQL GROUP BY query joined to
   the list page.
+
+> **Status: DEFERRED** — Inline summary counts (`openDealsCount`, `contactsCount`, etc.) on the
+> `GET /companies` list response are not yet shipped. `CompanyResponse` currently returns only
+> the base fields (`id, name, domain, industry, ownerId`).
 
 ### 3. Pipedrive's sub-resource pattern for paginated related records
 
@@ -116,6 +123,10 @@ write affordances the API must support.
   keeps the initial page load to one request; the sub-resource endpoints support infinite scroll
   or "load more" in the UI without overloading the parent detail payload.
 
+> **Status: DEFERRED** — Sub-resource endpoints (`GET /companies/{id}/contacts`,
+> `/deals`, `/activities`) are not yet shipped. The current company detail endpoint
+> (`GET /companies/{id}`) returns only the company's own fields with no related-record embedding.
+
 ### 4. HubSpot's `primaryContact` embedding in company detail
 
 - **What**: The company detail response embeds the primary associated contact as a nested object
@@ -127,11 +138,16 @@ write affordances the API must support.
 - **From**: HubSpot CRM API v3 — `GET /crm/v3/objects/companies/{id}?associations=contacts`
   expands associated contact records; the HubSpot Company detail UI shows the "Primary Contact"
   in the right-hand panel.
-- **Why it fits**: The Contact-Company junction already carries `IsPrimary`
-  (see `.devclaw/research/domain-model.md` Borrowed §1). The API should project this as
-  `primaryContact` (embedded name+email) and surface additional contacts via sub-resource. This
-  enables the company list and card views to show a human name alongside the company name — the
-  primary "who to call at Acme Corp" — without a separate lookup.
+- **Why it fits**: The shipped domain model uses `Contact.CompanyId: Guid?` — a single nullable
+  FK pointing from Contact to Company (the domain-model research proposed a `ContactCompanyLink`
+  junction with `IsPrimary`, but the shipped implementation uses a simpler single-FK — see AGENTS.md
+  Key decisions). Any contact whose `CompanyId` equals this company is a contact of the company;
+  the "primary contact" is the one with the earliest link (or the first returned). The API should
+  project this as `primaryContact` (embedded `{ id, name, email }`) so company list and card views
+  can show a human name without a separate lookup.
+
+> **Status: DEFERRED** — Inline `primaryContact` embedding in `GET /companies/{id}` is not yet
+> shipped. The current detail endpoint returns only the company's own fields.
 
 ### 5. Attio's unified activity feed on company detail (cross-anchor aggregation)
 
@@ -151,6 +167,9 @@ write affordances the API must support.
   `Activity.CompanyId` is set) would miss the majority of sales interactions, which are
   anchored to the contact or deal. The cross-anchor merge is a read-side aggregation (SQL UNION
   or application-layer merge) that does not change the domain model.
+
+> **Status: DEFERRED** — Cross-anchor activity aggregation in `GET /companies/{id}` is not yet
+> shipped. Requires the sub-resource endpoints from Borrowed §3 to be implemented first.
 
 ---
 

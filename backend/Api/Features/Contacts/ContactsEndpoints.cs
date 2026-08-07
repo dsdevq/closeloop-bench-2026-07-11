@@ -22,6 +22,8 @@ public static class ContactsEndpoints
     private static async Task<IResult> ListContacts(CrmDbContext db)
     {
         var contacts = await db.Contacts
+            .OrderBy(c => c.Name)
+            .Take(200)
             .Select(c => new ContactResponse(c.Id, c.Name, c.Email, c.Phone, c.CompanyId, c.OwnerId))
             .ToListAsync();
         return Results.Ok(contacts);
