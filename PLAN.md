@@ -38,6 +38,17 @@ Done = every foundation milestone checked + done-gate green.
        row caps on list endpoints; AGENTS.md Key decisions updated
 - [x] M9 Steering fixes — GET /deals row cap (Take(200)/OrderBy Title) + test; domain-model.md
        summary table corrected with SHIPPED/DIVERGED/DEFERRED markers
+- [x] M10 Cross-object search — GET /search?q= with grouped results (10/type cap), TotalHits from
+       uncapped CountAsync per type, research artifact citing Salesforce/HubSpot/Pipedrive/Attio/Zoho
+
+## Tasks — M10 (done)
+
+- [x] Create `.devclaw/research/search.md` citing all five reference CRMs
+- [x] Create `SearchDtos.cs` (SearchContactResult, SearchCompanyResult, SearchDealResult, SearchResponse with TotalHits)
+- [x] Create `SearchEndpoints.cs` — GET /search?q=, cap at 10/type, TotalHits from uncapped CountAsync per type
+- [x] Wire `MapSearchEndpoints()` in Program.cs
+- [x] Create `SearchEndpointsTests.cs` with regression tests including TotalHits-vs-cap assertions
+- [x] Update PLAN.md
 
 ## Tasks — M9 (done)
 

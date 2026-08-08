@@ -4,6 +4,7 @@ using Api.Features.Contacts;
 using Api.Features.Deals;
 using Api.Features.Notifications;
 using Api.Features.Pipelines;
+using Api.Features.Search;
 using Domain.Interfaces;
 using Infrastructure;
 using Infrastructure.Services;
@@ -47,6 +48,7 @@ app.MapDealsEndpoints();
 app.MapPipelinesEndpoints();
 app.MapActivitiesEndpoints();
 app.MapNotificationsEndpoints();
+app.MapSearchEndpoints();
 
 app.Run();
 

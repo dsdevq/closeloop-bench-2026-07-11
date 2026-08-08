@@ -199,6 +199,7 @@ them in. Do not omit or rename a section.
 | `.devclaw/research/pipelines.md` | Pipeline CRUD, stage management, metrics | merged |
 | `.devclaw/research/notifications.md` | Notification entity, trigger taxonomy, dispatch model, mention surface | merged |
 | `.devclaw/research/deploy-shape.md` | Deploy shape, Dockerfile multi-stage build, DATABASE_URL precedence | merged |
+| `.devclaw/research/search.md` | Cross-object global search, grouped results, TotalHits semantics | merged |
 
 The `notifications.md` artifact defines: `Notification` entity (`Id`, `RecipientUserId`, `Trigger`,
 `Title`, `Body`, `RelatedEntityId`, `RelatedEntityType`, `IsRead`, `CreatedAt`); `NotificationTrigger`
@@ -285,6 +286,21 @@ Also: `Results.ValidationProblem` must receive `statusCode: StatusCodes.Status42
 - `environment.apiBaseUrl` is the single source for the backend base URL (`''` in production, `http://localhost:5000` in development).
 - New routes are added to `app.routes.ts` as `loadComponent` lazy entries (no eagerly imported components in the router).
 - Tests use `provideHttpClient()` + `provideHttpClientTesting()` (not `HttpClientTestingModule`); `HttpTestingController` from `@angular/common/http/testing` intercepts all requests.
+
+### Cross-object search — GET /search?q=
+
+`GET /search?q={term}` searches Contacts (Name, Email), Companies (Name, Domain), and Deals
+(Title) with a case-insensitive substring match. Returns up to 10 results per type (ordered by
+Name/Title ascending) plus a `TotalHits` integer that is the **sum of uncapped `CountAsync()`
+calls per type** — not derived from the capped list lengths. This distinction matters: when 15
+contacts match, the response contains 10 contacts in the list and `TotalHits: 15`, giving the
+client accurate signal to render "see all 15 contacts". The research artifact
+(`.devclaw/research/search.md`) cites the HubSpot `total` field contract as the source of this
+design, and names Salesforce SOSL / Pipedrive itemSearch as the cross-object grouping model.
+
+**Do not change TotalHits to use list lengths.** That breaks the documented "see all" affordance
+and is regression-tested by `Search_MoreThan10MatchingContacts_TotalHitsReflectsTrueCountNotCappedList`
+in `backend/Api.Tests/Features/Search/SearchEndpointsTests.cs`.
 
 ## Key decisions
 
